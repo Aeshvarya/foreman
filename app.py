@@ -351,6 +351,45 @@ h1, h2, h3 {{
 ::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.1); border-radius: 3px; }}
 ::-webkit-scrollbar-thumb:hover {{ background: rgba(255,255,255,0.18); }}
 
+/* ===== GRAPH FILTER TOOLBAR ===== */
+.stCheckbox label {{
+    font-size: .82rem !important;
+    font-weight: 500 !important;
+    color: {MUTED} !important;
+    transition: color 200ms ease;
+}}
+.stCheckbox label:hover {{
+    color: {TEXT} !important;
+}}
+.stCheckbox [data-testid="stCheckbox"] {{
+    background: rgba(255,255,255,0.03);
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: .3rem .65rem;
+    transition: all 200ms ease;
+}}
+.stCheckbox [data-testid="stCheckbox"]:hover {{
+    border-color: rgba(245,166,35,0.25);
+    background: rgba(255,255,255,0.05);
+}}
+/* Search input in toolbar */
+.stTextInput input {{
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 8px !important;
+    color: {TEXT} !important;
+    font-size: .82rem !important;
+    padding: .35rem .7rem !important;
+    transition: border-color 200ms ease !important;
+}}
+.stTextInput input:focus {{
+    border-color: {AMBER} !important;
+    box-shadow: 0 0 0 1px rgba(245,166,35,0.15) !important;
+}}
+.stTextInput input::placeholder {{
+    color: rgba(138,143,160,0.6) !important;
+}}
+
 /* ===== EXPANDER OVERRIDES ===== */
 .streamlit-expanderHeader {{
     font-family: 'Space Grotesk', sans-serif;
@@ -411,79 +450,279 @@ with tab_sim:
             <span class="conf-pulse">{r.confidence:.0%}</span> — {r.confidence_source}</small>
           </div></div>""", unsafe_allow_html=True)
 
+    # -------------------------------------------------------- graph toolbar
+    import networkx as nx
+
+    st.markdown("""<div style="margin-top:.4rem"></div>""", unsafe_allow_html=True)
+    toolbar_cols = st.columns([1.2, 1.2, 1.2, 1.4, 2])
+    with toolbar_cols[0]:
+        show_suppliers = st.checkbox("Suppliers", value=True, key="gf_sup")
+    with toolbar_cols[1]:
+        show_materials = st.checkbox("Materials", value=True, key="gf_mat")
+    with toolbar_cols[2]:
+        show_activities = st.checkbox("Activities", value=True, key="gf_act")
+    with toolbar_cols[3]:
+        critical_only = st.checkbox("Critical path only", value=False, key="gf_crit")
+    with toolbar_cols[4]:
+        search_node = st.text_input(
+            "Highlight node", placeholder="e.g. MAT-2",
+            key="gf_search", label_visibility="collapsed")
+
     # ------------------------------------------------------------- graph
     slipped_ids = {e["activity"] for e in r.slipped}
-    layers = {SUPPLIER: 0, MATERIAL: 1, ACTIVITY: 2}
-    pos, counts = {}, {0: 0, 1: 0, 2: 0}
-    for n, d in sorted(g.nodes(data=True), key=lambda x: x[0]):
-        layer = layers[d["kind"]]
-        pos[n] = (layer * 2.4, -counts[layer])
-        counts[layer] += 1
 
+    # Determine which nodes are on the critical/cascade path
     hot = slipped_ids | {mat_id}
-    cold_x, cold_y, hot_x, hot_y = [], [], [], []
-    for u, v in g.edges():
-        seg_x = [pos[u][0], pos[v][0], None]
-        seg_y = [pos[u][1], pos[v][1], None]
-        if u in hot and v in hot:
-            hot_x += seg_x; hot_y += seg_y
-        else:
-            cold_x += seg_x; cold_y += seg_y
+    # Build full critical connected set including suppliers upstream of mat_id
+    critical_set = set(hot)
+    for pred in g.predecessors(mat_id):
+        critical_set.add(pred)
+    for act_id in slipped_ids:
+        for pred in g.predecessors(act_id):
+            if g.nodes[pred]["kind"] == MATERIAL and pred in hot:
+                for pp in g.predecessors(pred):
+                    critical_set.add(pp)
 
-    node_x, node_y, colors, sizes, texts, borders = [], [], [], [], [], []
+    # Build search highlight set
+    search_set = set()
+    search_q = search_node.strip().upper() if search_node else ""
+    if search_q:
+        for n in g.nodes():
+            if search_q in n.upper() or search_q in g.nodes[n].get("name", "").upper():
+                search_set.add(n)
+                search_set |= set(g.predecessors(n))
+                search_set |= set(g.successors(n))
+
+    # Category visibility filter
+    kind_visible = set()
+    if show_suppliers:
+        kind_visible.add(SUPPLIER)
+    if show_materials:
+        kind_visible.add(MATERIAL)
+    if show_activities:
+        kind_visible.add(ACTIVITY)
+
+    # Filter nodes
+    visible_nodes = set()
     for n, d in g.nodes(data=True):
-        node_x.append(pos[n][0]); node_y.append(pos[n][1])
-        if n == mat_id:
-            colors.append(AMBER); sizes.append(24); borders.append(AMBER)
-        elif n in slipped_ids:
-            colors.append(RED); sizes.append(19); borders.append(RED)
-        elif n == g.graph["handover"] and r.handover_slip_days == 0:
-            colors.append(GREEN); sizes.append(19); borders.append(GREEN)
+        if d["kind"] not in kind_visible:
+            continue
+        if critical_only and n not in critical_set:
+            continue
+        visible_nodes.add(n)
+
+    # Layout: normalized coordinates (0..1 x, spaced y) for responsive fit
+    layers = {SUPPLIER: 0, MATERIAL: 1, ACTIVITY: 2}
+    layer_nodes = {0: [], 1: [], 2: []}
+    for n in sorted(visible_nodes):
+        d = g.nodes[n]
+        layer_nodes[layers[d["kind"]]].append(n)
+
+    max_count = max((len(v) for v in layer_nodes.values()), default=1)
+    pos = {}
+    # Use 3 evenly spaced columns at x = 0.0, 0.5, 1.0
+    for layer_idx, nodes in layer_nodes.items():
+        x_pos = layer_idx * 0.5
+        n_nodes = len(nodes)
+        for i, n in enumerate(nodes):
+            # Center vertically with even spacing
+            if n_nodes == 1:
+                y_pos = 0.0
+            else:
+                y_pos = -(i - (n_nodes - 1) / 2) * (1.0 / max(max_count - 1, 1))
+            pos[n] = (x_pos, y_pos)
+
+    # ---- Edge helpers: bezier curves + color-coding ----
+    def bezier_edge(x0, y0, x1, y1, n_pts=20):
+        """Generate a smooth cubic bezier curve between two points."""
+        cx = (x0 + x1) / 2  # control point at midpoint x
+        xs, ys = [], []
+        for i in range(n_pts + 1):
+            t = i / n_pts
+            # Cubic bezier with control points creating a smooth S-curve
+            bx = (1-t)**3 * x0 + 3*(1-t)**2*t * cx + 3*(1-t)*t**2 * cx + t**3 * x1
+            by = (1-t)**3 * y0 + 3*(1-t)**2*t * (y0 + (y1-y0)*0.15) + 3*(1-t)*t**2 * (y0 + (y1-y0)*0.85) + t**3 * y1
+            xs.append(bx)
+            ys.append(by)
+        xs.append(None); ys.append(None)
+        return xs, ys
+
+    # Classify edges into 3 tiers: critical (red), delayed (amber), normal (grey)
+    cold_x, cold_y = [], []
+    amber_x, amber_y = [], []
+    hot_x, hot_y = [], []
+
+    for u, v in g.edges():
+        if u not in visible_nodes or v not in visible_nodes:
+            continue
+        bx, by = bezier_edge(pos[u][0], pos[u][1], pos[v][0], pos[v][1])
+        # Determine edge category
+        u_hot = u in hot
+        v_hot = v in hot
+        if u_hot and v_hot:
+            hot_x += bx; hot_y += by       # critical path — red
+        elif u_hot or v_hot:
+            amber_x += bx; amber_y += by   # delayed-adjacent — amber
         else:
-            colors.append(DIM_NODE); sizes.append(13); borders.append(STEEL)
-        texts.append(f"<b>{n}</b><br>{d.get('name','')}")
+            cold_x += bx; cold_y += by      # normal — grey
+
+    # ---- Build node arrays ----
+    node_x, node_y = [], []
+    node_colors, node_sizes, node_texts, node_borders = [], [], [], []
+    node_labels = []
+    glow_x, glow_y, glow_colors = [], [], []
+
+    for n in visible_nodes:
+        d = g.nodes[n]
+        nx_pos, ny_pos = pos[n]
+        # Determine if dimmed by search
+        is_dimmed = bool(search_set) and n not in search_set
+
+        node_x.append(nx_pos); node_y.append(ny_pos)
+
+        if is_dimmed:
+            node_colors.append("rgba(46,52,64,0.35)")
+            node_sizes.append(9)
+            node_borders.append("rgba(107,125,147,0.1)")
+        elif n == mat_id:
+            node_colors.append(AMBER); node_sizes.append(26)
+            node_borders.append(AMBER)
+            glow_x.append(nx_pos); glow_y.append(ny_pos)
+            glow_colors.append("rgba(245,166,35,0.18)")
+        elif n in slipped_ids:
+            node_colors.append(RED); node_sizes.append(20)
+            node_borders.append(RED)
+            glow_x.append(nx_pos); glow_y.append(ny_pos)
+            glow_colors.append("rgba(224,90,80,0.18)")
+        elif n == g.graph["handover"] and r.handover_slip_days == 0:
+            node_colors.append(GREEN); node_sizes.append(20)
+            node_borders.append(GREEN)
+            glow_x.append(nx_pos); glow_y.append(ny_pos)
+            glow_colors.append("rgba(62,175,110,0.18)")
+        else:
+            node_colors.append(DIM_NODE); node_sizes.append(13)
+            node_borders.append(STEEL)
+
+        kind_label = {"supplier": "SUP", "material": "MAT", "activity": "ACT"}
+        short_name = d.get("name", "")
+        if len(short_name) > 30:
+            short_name = short_name[:28] + "…"
+        node_labels.append(n if is_dimmed else n)
+        node_texts.append(
+            f"<b>{n}</b><br>{d.get('name','')}<br>"
+            f"<span style='color:{MUTED}'>{kind_label.get(d['kind'], '')}</span>")
 
     fig = go.Figure()
-    # Cold edges
-    fig.add_trace(go.Scatter(
-        x=cold_x, y=cold_y, mode="lines",
-        line=dict(color="rgba(107,125,147,0.18)", width=1),
-        hoverinfo="none"))
-    # Hot edges (cascade path)
-    fig.add_trace(go.Scatter(
-        x=hot_x, y=hot_y, mode="lines",
-        line=dict(color=RED, width=2.8),
-        hoverinfo="none"))
-    # Nodes
+
+    # Layer 0: Normal edges (grey)
+    if cold_x:
+        fig.add_trace(go.Scatter(
+            x=cold_x, y=cold_y, mode="lines",
+            line=dict(color="rgba(107,125,147,0.15)", width=1, shape="spline"),
+            hoverinfo="none", showlegend=False))
+
+    # Layer 1: Delayed-adjacent edges (amber)
+    if amber_x:
+        fig.add_trace(go.Scatter(
+            x=amber_x, y=amber_y, mode="lines",
+            line=dict(color="rgba(245,166,35,0.4)", width=1.8, shape="spline"),
+            hoverinfo="none", showlegend=False))
+
+    # Layer 2: Critical path edges (red)
+    if hot_x:
+        fig.add_trace(go.Scatter(
+            x=hot_x, y=hot_y, mode="lines",
+            line=dict(color=RED, width=2.8, shape="spline"),
+            hoverinfo="none", showlegend=False))
+
+    # Layer 3: Glow rings behind highlighted nodes
+    if glow_x:
+        fig.add_trace(go.Scatter(
+            x=glow_x, y=glow_y, mode="markers",
+            marker=dict(size=40, color=glow_colors,
+                        line=dict(width=0), opacity=0.5),
+            hoverinfo="none", showlegend=False))
+
+    # Layer 4: Nodes
     fig.add_trace(go.Scatter(
         x=node_x, y=node_y, mode="markers+text",
         marker=dict(
-            size=sizes, color=colors,
-            line=dict(color=borders, width=1.5),
+            size=node_sizes, color=node_colors,
+            line=dict(color=node_borders, width=1.5),
             opacity=0.95),
-        text=list(g.nodes()), textposition="middle right",
+        text=node_labels, textposition="middle right",
         textfont=dict(color=MUTED, size=10, family="Inter"),
-        hovertext=texts, hoverinfo="text",
+        hovertext=node_texts, hoverinfo="text",
         hoverlabel=dict(
             bgcolor="#1A1D24",
             bordercolor=AMBER,
-            font=dict(family="Inter", size=12, color=TEXT))))
+            font=dict(family="Inter", size=12, color=TEXT)),
+        showlegend=False))
+
+    # Column header annotations
+    col_headers = []
+    if show_suppliers:
+        col_headers.append((0.0, "SUPPLIERS"))
+    if show_materials:
+        col_headers.append((0.5, "MATERIALS"))
+    if show_activities:
+        col_headers.append((1.0, "ACTIVITIES"))
+
+    annotations = []
+    y_max = max((p[1] for p in pos.values()), default=0.5) if pos else 0.5
+    for col_x, label in col_headers:
+        annotations.append(dict(
+            x=col_x, y=y_max + 0.18,
+            text=f"<b>{label}</b>",
+            showarrow=False,
+            font=dict(family="Inter", size=10, color=STEEL,
+                      weight=700),
+            xanchor="center", yanchor="bottom"))
+
     fig.update_layout(
         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-        showlegend=False, height=470,
-        xaxis=dict(visible=False), yaxis=dict(visible=False),
-        margin=dict(l=0, r=0, t=10, b=0),
-        hoverdistance=20)
+        showlegend=False,
+        height=max(380, 48 * max_count + 100),
+        xaxis=dict(
+            visible=False, range=[-0.12, 1.25],
+            constrain="domain", fixedrange=True),
+        yaxis=dict(
+            visible=False, scaleanchor="x", scaleratio=0.6,
+            fixedrange=True),
+        margin=dict(l=10, r=10, t=35, b=10),
+        hoverdistance=30,
+        annotations=annotations,
+        dragmode=False)
 
     # Graph canvas container
     st.markdown('<div class="graph-canvas">', unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True,
-                    config={"displayModeBar": False})
+                    config={"displayModeBar": False, "staticPlot": False,
+                            "scrollZoom": False})
+    # Embedded legend
     st.markdown(f"""
     <div class="graph-legend">
-        <span>⬤ <span style="color:{AMBER}">amber</span> = delayed material</span>
-        <span>⬤ <span style="color:{RED}">red</span> = slipped activities &amp; cascade path</span>
-        <span>⬤ <span style="color:{DIM_NODE}">grey</span> = unaffected</span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="color:{AMBER};font-size:.6rem">⬤</span>
+            <span>delayed material</span></span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="color:{RED};font-size:.6rem">⬤</span>
+            <span>slipped / critical path</span></span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="color:{GREEN};font-size:.6rem">⬤</span>
+            <span>safe (handover)</span></span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="color:{DIM_NODE};font-size:.6rem">⬤</span>
+            <span>unaffected</span></span>
+        <span style="margin-left:.6rem;border-left:1px solid rgba(255,255,255,0.08);padding-left:.8rem;display:inline-flex;align-items:center;gap:.3rem">
+            <span style="display:inline-block;width:18px;height:2px;background:rgba(107,125,147,0.3);border-radius:1px"></span>
+            <span>normal</span></span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="display:inline-block;width:18px;height:2px;background:rgba(245,166,35,0.5);border-radius:1px"></span>
+            <span>delayed</span></span>
+        <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <span style="display:inline-block;width:18px;height:2.5px;background:{RED};border-radius:1px"></span>
+            <span>critical</span></span>
     </div>
     </div>""", unsafe_allow_html=True)
 
