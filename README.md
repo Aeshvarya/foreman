@@ -1,4 +1,8 @@
-# Foreman 🏗️
+<p align="center">
+  <img src="assets/foreman-logo.png" alt="Foreman logo" width="140">
+</p>
+
+<h1 align="center">Foreman</h1>
 
 **The reasoning brain for construction supply chains.**
 
