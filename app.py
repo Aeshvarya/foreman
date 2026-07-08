@@ -441,6 +441,9 @@ h1, h2, h3 {{
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------ data
+if "reminders" not in st.session_state:
+    st.session_state.reminders = {}
+
 g = build_graph()
 s = graph_summary(g)
 baseline_handover = run_cascade(g, "MAT-1", 0).baseline_handover
@@ -772,14 +775,152 @@ with tab_sim:
     # ----------------------------------------------------------- details
     cA, cB = st.columns(2)
     with cA:
-        rows = "".join(
-            f"<div style='margin:.35rem 0'><b>{e['activity']}</b> {e['name']}"
-            f"<span style='color:{MUTED}'> · {e['baseline_finish']} → "
-            f"{e['new_finish']}</span> <span style='color:{RED};font-weight:600'>"
-            f"+{e['slip_days']}d</span></div>"
-            for e in r.slipped) or f"<span style='color:{MUTED}'>None — float absorbs everything.</span>"
-        st.markdown(f'<div class="card"><div class="hd">activities that slip '
-                    f'({len(r.slipped)})</div>{rows}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hd" style="margin-bottom:0.8rem;">activities that slip ({len(r.slipped)})</div>', unsafe_allow_html=True)
+        if not r.slipped:
+            st.markdown(f"<span style='color:{MUTED}'>None — float absorbs everything.</span>", unsafe_allow_html=True)
+        else:
+            for e in r.slipped:
+                act_id = e['activity']
+                
+                # Fetch upstream material confidence and source if available
+                act_node = g.nodes[act_id]
+                mats = act_node.get("needs_materials", [])
+                if mats:
+                    mat_conf = g.nodes[mats[0]]["confidence"]
+                    mat_source = g.nodes[mats[0]]["confidence_source"]
+                else:
+                    mat_conf = r.confidence
+                    mat_source = r.confidence_source
+
+                # Calculate days/hours remaining until deadline (new_finish)
+                import datetime
+                target_date = datetime.date.fromisoformat(e['new_finish'])
+                current_date = datetime.date.today()
+                delta = target_date - current_date
+                days_left = delta.days
+                if days_left < 0:
+                    days_left = 0
+                    hours_left = 0
+                else:
+                    # Deterministic mock hours based on hash of activity ID and day
+                    hours_left = (hash(act_id) % 24)
+
+                # Timer color thresholds
+                if days_left < 2:
+                    timer_color = RED
+                    timer_bg = "rgba(224,90,80,0.12)"
+                    timer_border = "rgba(224,90,80,0.3)"
+                elif days_left < 7:
+                    timer_color = AMBER
+                    timer_bg = "rgba(245,166,35,0.12)"
+                    timer_border = "rgba(245,166,35,0.3)"
+                else:
+                    timer_color = STEEL_BRIGHT
+                    timer_bg = "rgba(107,125,147,0.12)"
+                    timer_border = "rgba(107,125,147,0.3)"
+
+                # Bell icon toggle state
+                bell_key = f"bell_{act_id}"
+                if bell_key not in st.session_state:
+                    st.session_state[bell_key] = True
+                
+                bell_active = st.session_state[bell_key]
+                bell_icon = "🔔" if bell_active else "🔕"
+
+                # Slipped card HTML container
+                st.markdown(f"""
+                <div class="slipped-card-container">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                        <span style="font-family:'Space Grotesk'; font-weight:800; font-size:1.15rem; color:{TEXT};">{act_id}</span>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <div style="background:{timer_bg}; border:1px solid {timer_border}; border-radius:6px; padding:0.18rem 0.5rem; font-family:'Space Grotesk'; font-size:0.8rem; color:{timer_color}; font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;">
+                                ⏱️ {days_left}d:{hours_left}h
+                            </div>
+                            <span class="badge red pulse-badge">CRITICAL SLIP</span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.95rem; font-weight:600; color:{TEXT}; margin-bottom:0.7rem; line-height:1.2;">{e['name']}</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:0.7rem; margin-bottom:0.7rem;">
+                        <div>
+                            <div style="font-size:0.6rem; color:{MUTED}; text-transform:uppercase; letter-spacing:0.12em; margin-bottom:0.1rem;">Delay Duration</div>
+                            <div class="count-up-days" style="--target:{e['slip_days']}; font-family:'Space Grotesk'; font-weight:800; font-size:1.15rem; color:{RED};"></div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem; color:{MUTED}; text-transform:uppercase; letter-spacing:0.12em; margin-bottom:0.1rem;">Confidence</div>
+                            <div style="font-family:'Space Grotesk'; font-weight:800; font-size:1.15rem; color:{TEXT};">{mat_conf:.0%}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:0.78rem; color:{MUTED}; border-top:1px solid rgba(255,255,255,0.06); padding-top:0.6rem; line-height:1.35; margin-bottom:0.6rem;">
+                        <strong>Source:</strong> {mat_source}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Set Reminder Controls / Bell icon
+                action_col1, action_col2 = st.columns([4, 1])
+                with action_col1:
+                    reminder_data = st.session_state.reminders.get(act_id)
+                    if reminder_data:
+                        note_text = reminder_data['note']
+                        note_short = f" ({note_text[:12]}...)" if note_text else ""
+                        st.markdown(f"""
+                        <div style="display:inline-flex; align-items:center; background:rgba(245,166,35,0.08); border:1px solid rgba(245,166,35,0.25); border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem; color:{AMBER}; font-weight:600; margin-bottom:0.5rem; width:100%;">
+                            ⏰ Reminder: {reminder_data['date'].strftime('%b %d')} @ {reminder_data['time'].strftime('%H:%M')}{note_short}
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        btn_col1, btn_col2 = st.columns(2)
+                        with btn_col1:
+                            if st.button("✏️ Edit", key=f"edit_btn_{act_id}", use_container_width=True):
+                                st.session_state[f"show_form_{act_id}"] = True
+                                st.rerun()
+                        with btn_col2:
+                            if st.button("🗑️ Dismiss", key=f"dismiss_btn_{act_id}", use_container_width=True):
+                                st.session_state.reminders.pop(act_id, None)
+                                st.rerun()
+                    else:
+                        if not st.session_state.get(f"show_form_{act_id}"):
+                            if st.button("⏰ Set Reminder", key=f"set_btn_{act_id}", use_container_width=True):
+                                st.session_state[f"show_form_{act_id}"] = True
+                                st.rerun()
+                
+                with action_col2:
+                    if st.button(bell_icon, key=f"bell_btn_{act_id}", use_container_width=True):
+                        st.session_state[bell_key] = not bell_active
+                        st.rerun()
+
+                # Form render
+                if st.session_state.get(f"show_form_{act_id}"):
+                    with st.form(key=f"reminder_form_el_{act_id}"):
+                        st.markdown(f"<div style='font-size:0.85rem; font-weight:700; color:{AMBER}; margin-bottom:0.5rem;'>Set Reminder for {act_id}</div>", unsafe_allow_html=True)
+                        default_date = datetime.date.today()
+                        default_time = datetime.time(9, 0)
+                        default_note = ""
+                        if reminder_data:
+                            default_date = reminder_data["date"]
+                            default_time = reminder_data["time"]
+                            default_note = reminder_data["note"]
+
+                        r_date = st.date_input("Reminder Date", value=default_date, key=f"r_date_{act_id}")
+                        r_time = st.time_input("Reminder Time", value=default_time, key=f"r_time_{act_id}")
+                        r_note = st.text_input("Notes", value=default_note, placeholder="Action item...", key=f"r_note_{act_id}")
+                        
+                        f_col1, f_col2 = st.columns(2)
+                        with f_col1:
+                            if st.form_submit_button("Save", use_container_width=True):
+                                st.session_state.reminders[act_id] = {
+                                    "date": r_date,
+                                    "time": r_time,
+                                    "note": r_note
+                                }
+                                st.session_state[f"show_form_{act_id}"] = False
+                                st.rerun()
+                        with f_col2:
+                            if st.form_submit_button("Cancel", use_container_width=True):
+                                st.session_state[f"show_form_{act_id}"] = False
+                                st.rerun()
+                
+                st.markdown("<div style='margin-bottom:1.5rem; border-bottom:1px solid rgba(255,255,255,0.04);'></div>", unsafe_allow_html=True)
     with cB:
         rows = "".join(
             f"<div style='margin:.35rem 0;color:{MUTED}'>{e['activity']} {e['name']}</div>"
