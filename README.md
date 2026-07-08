@@ -46,6 +46,10 @@ That contrast **is** the intelligence: a dumb tracker panics at every delay; For
 
 **4. Demo UI** (`app.py`) — Streamlit, dark/amber. A cascade simulator with live graph viz + the risk radar.
 
+![Cascade simulator — steel slips 5 days, handover breaks](screenshots/cascade-tab.png)
+
+![Risk radar — the generators are the silent killer](screenshots/risk-radar.png)
+
 ## Run it
 
 ```bash
