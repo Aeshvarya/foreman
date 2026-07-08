@@ -11,9 +11,14 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 import plotly.graph_objects as go
 import streamlit as st
 
-from cascade import run_cascade
-from graph import ACTIVITY, MATERIAL, SUPPLIER, build_graph, graph_summary
-from risk import risk_radar
+try:
+    from src.cascade import run_cascade  # type: ignore
+    from src.graph import ACTIVITY, MATERIAL, SUPPLIER, build_graph, graph_summary  # type: ignore
+    from src.risk import risk_radar  # type: ignore
+except ImportError:
+    from cascade import run_cascade  # type: ignore
+    from graph import ACTIVITY, MATERIAL, SUPPLIER, build_graph, graph_summary  # type: ignore
+    from risk import risk_radar  # type: ignore
 
 # ----------------------------------------------------------------- brand
 BG = "#0D0F12"
