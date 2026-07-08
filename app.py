@@ -3,6 +3,7 @@
 Run:  streamlit run app.py
 """
 
+import base64
 import sys
 from pathlib import Path
 
@@ -10,6 +11,14 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import plotly.graph_objects as go
 import streamlit as st
+from PIL import Image
+
+LOGO_PATH = Path(__file__).parent / "assets" / "foreman-logo.png"
+
+
+def _logo_data_uri() -> str:
+    b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+    return f"data:image/png;base64,{b64}"
 
 from cascade import run_cascade
 from graph import ACTIVITY, MATERIAL, SUPPLIER, build_graph, graph_summary
@@ -27,7 +36,6 @@ MUTED = "#9B9BA8"
 DIM_NODE = "#3A3A46"
 
 ICONS = {
-    "logo": f'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="{AMBER}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M4 20V10l8-6 8 6v10"/><path d="M12 20v-6"/><path d="M9 20v-3h6v3"/></svg>',
     "alert": f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{RED}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
     "shield": f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{GREEN}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
     "wrench": f'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{AMBER}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
@@ -39,7 +47,7 @@ def svg(name: str) -> str:
 
 
 st.set_page_config(page_title="Foreman — reasoning brain",
-                   page_icon="🏗️", layout="wide")
+                   page_icon=Image.open(LOGO_PATH), layout="wide")
 
 st.markdown(f"""
 <style>
@@ -53,6 +61,7 @@ html, body, p, span, label, div {{ font-family: 'Inter', sans-serif; color: {TEX
 h1, h2, h3 {{ font-family: 'Space Grotesk', sans-serif !important; letter-spacing: -0.02em; }}
 
 .fm-wordmark {{ display:flex; align-items:center; gap:.6rem; margin-bottom:.2rem; }}
+.fm-logo-img {{ width:34px; height:34px; object-fit:contain; }}
 .fm-wordmark .name {{ font-family:'Space Grotesk'; font-size:1.9rem; font-weight:700; }}
 .fm-wordmark .dot  {{ color:{AMBER}; }}
 .fm-sub {{ color:{MUTED}; font-size:.92rem; margin-bottom:1.4rem; }}
@@ -115,7 +124,7 @@ baseline_handover = run_cascade(g, "MAT-1", 0).baseline_handover
 
 # ---------------------------------------------------------------- header
 st.markdown(f"""
-<div class="fm-wordmark">{svg("logo")}<span class="name">FOREMAN<span class="dot">.</span></span></div>
+<div class="fm-wordmark"><img src="{_logo_data_uri()}" alt="Foreman" class="fm-logo-img"><span class="name">FOREMAN<span class="dot">.</span></span></div>
 <div class="fm-sub">The reasoning brain for construction supply chains ·
 <b>{s["project"]}</b> · synthetic demo data</div>
 <div class="kpi-row">
