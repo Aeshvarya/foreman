@@ -436,6 +436,23 @@ h1, h2, h3 {{
     content: counter(num) " days";
 }}
 
+/* ===== ABSORBED ITEM ===== */
+.absorbed-item {{
+    background: rgba(62,175,110,0.035);
+    border: 1px solid rgba(62,175,110,0.12);
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 0.55rem;
+    display: flex;
+    align-items: center;
+    transition: all 200ms ease;
+}}
+.absorbed-item:hover {{
+    background: rgba(62,175,110,0.06);
+    border-color: rgba(62,175,110,0.25);
+    transform: translateX(2px);
+}}
+
 /* ===== EXPANDER OVERRIDES ===== */
 .streamlit-expanderHeader {{
     font-family: 'Space Grotesk', sans-serif;
@@ -927,11 +944,21 @@ with tab_sim:
                 
                 st.markdown("<div style='margin-bottom:1.5rem; border-bottom:1px solid rgba(255,255,255,0.04);'></div>", unsafe_allow_html=True)
     with cB:
-        rows = "".join(
-            f"<div style='margin:.35rem 0;color:{MUTED}'>{e['activity']} {e['name']}</div>"
-            for e in r.absorbed) or f"<span style='color:{MUTED}'>—</span>"
-        st.markdown(f'<div class="card"><div class="hd">absorbed by float '
-                    f'({len(r.absorbed)})</div>{rows}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hd" style="margin-bottom:0.8rem;">absorbed by float ({len(r.absorbed)})</div>', unsafe_allow_html=True)
+        if not r.absorbed:
+            st.markdown(f"<span style='color:{MUTED}'>—</span>", unsafe_allow_html=True)
+        else:
+            for e in r.absorbed:
+                st.markdown(f"""
+                <div class="absorbed-item">
+                    <span style="font-family:'Space Grotesk'; font-weight:700; color:{GREEN}; font-size:1.05rem; display:inline-flex; align-items:center; gap:0.35rem; width:80px; flex-shrink:0;">
+                        ✓ {e['activity']}
+                    </span>
+                    <span style="color:{TEXT}; font-size:0.88rem; font-weight:500; line-height:1.2;">
+                        {e['name']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 
     st.markdown(f'<div class="card mitig"><div class="hd">mitigation</div>'
                 f'{svg("wrench")} &nbsp;{r.mitigation}</div>',
