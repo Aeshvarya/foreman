@@ -1,0 +1,95 @@
+{
+  "project": {
+    "name": "Sunrise DC-1 — 12MW Data Center, Jaipur",
+    "description": "Synthetic demo project: a mission-critical data center build. All data is synthetic but modeled on real construction supply-chain structures.",
+    "handover_milestone": "ACT-12"
+  },
+  "suppliers": [
+    {"id": "SUP-1", "name": "Bharat Steel Fabricators", "location": "Bhiwadi", "reliability": 0.86},
+    {"id": "SUP-2", "name": "VoltGear Switchgear Pvt Ltd", "location": "Pune", "reliability": 0.78},
+    {"id": "SUP-3", "name": "CoolFlow HVAC Systems", "location": "Chennai", "reliability": 0.91},
+    {"id": "SUP-4", "name": "Meridian Cables", "location": "Ahmedabad", "reliability": 0.94},
+    {"id": "SUP-5", "name": "Apex Precast Concrete", "location": "Jaipur", "reliability": 0.9},
+    {"id": "SUP-6", "name": "SafeGen Diesel Generators", "location": "Faridabad", "reliability": 0.82}
+  ],
+  "materials": [
+    {
+      "id": "MAT-1", "name": "Structural steel package (roof + mezzanine)",
+      "supplier": "SUP-1", "po": "PO-1001",
+      "submittal_status": "approved", "fabrication_status": "in_fabrication",
+      "shipment_status": "not_shipped", "current_location": "Bhiwadi works",
+      "lead_time_days": 45, "roj_date": "2026-08-10", "expected_arrival": "2026-08-07",
+      "confidence": 0.92, "confidence_source": "supplier confirmation email + fab photos"
+    },
+    {
+      "id": "MAT-2", "name": "4000A LV switchgear lineup",
+      "supplier": "SUP-2", "po": "PO-1002",
+      "submittal_status": "approved", "fabrication_status": "in_fabrication",
+      "shipment_status": "not_shipped", "current_location": "Pune factory",
+      "lead_time_days": 90, "roj_date": "2026-08-24", "expected_arrival": "2026-08-22",
+      "confidence": 0.7, "confidence_source": "inferred from average factory queue — no direct confirmation"
+    },
+    {
+      "id": "MAT-3", "name": "CRAC cooling units (x8)",
+      "supplier": "SUP-3", "po": "PO-1003",
+      "submittal_status": "approved", "fabrication_status": "complete",
+      "shipment_status": "in_transit", "current_location": "NH-48 near Surat",
+      "lead_time_days": 60, "roj_date": "2026-08-17", "expected_arrival": "2026-08-13",
+      "confidence": 0.95, "confidence_source": "GPS tracking feed"
+    },
+    {
+      "id": "MAT-4", "name": "MV/LV power cabling (11kV + 415V drums)",
+      "supplier": "SUP-4", "po": "PO-1004",
+      "submittal_status": "approved", "fabrication_status": "complete",
+      "shipment_status": "delivered", "current_location": "site laydown yard",
+      "lead_time_days": 30, "roj_date": "2026-08-20", "expected_arrival": "2026-07-30",
+      "confidence": 0.99, "confidence_source": "site GRN (goods received note)"
+    },
+    {
+      "id": "MAT-5", "name": "Precast concrete wall panels",
+      "supplier": "SUP-5", "po": "PO-1005",
+      "submittal_status": "approved", "fabrication_status": "complete",
+      "shipment_status": "delivered", "current_location": "site laydown yard",
+      "lead_time_days": 25, "roj_date": "2026-07-28", "expected_arrival": "2026-07-25",
+      "confidence": 0.99, "confidence_source": "site GRN"
+    },
+    {
+      "id": "MAT-6", "name": "2MVA diesel generators (x4)",
+      "supplier": "SUP-6", "po": "PO-1006",
+      "submittal_status": "under_review", "fabrication_status": "not_started",
+      "shipment_status": "not_shipped", "current_location": "—",
+      "lead_time_days": 75, "roj_date": "2026-09-02", "expected_arrival": "2026-09-05",
+      "confidence": 0.6, "confidence_source": "submittal still under review — fabrication cannot start; arrival inferred"
+    },
+    {
+      "id": "MAT-7", "name": "Fire suppression system (NOVEC skids)",
+      "supplier": "SUP-3", "po": "PO-1007",
+      "submittal_status": "approved", "fabrication_status": "in_fabrication",
+      "shipment_status": "not_shipped", "current_location": "Chennai works",
+      "lead_time_days": 50, "roj_date": "2026-09-07", "expected_arrival": "2026-09-01",
+      "confidence": 0.88, "confidence_source": "weekly supplier progress report"
+    },
+    {
+      "id": "MAT-8", "name": "Busway / busbar trunking",
+      "supplier": "SUP-2", "po": "PO-1008",
+      "submittal_status": "approved", "fabrication_status": "in_fabrication",
+      "shipment_status": "not_shipped", "current_location": "Pune factory",
+      "lead_time_days": 40, "roj_date": "2026-08-28", "expected_arrival": "2026-08-25",
+      "confidence": 0.75, "confidence_source": "supplier verbal update on call"
+    }
+  ],
+  "activities": [
+    {"id": "ACT-1", "name": "Precast wall erection", "duration_days": 10, "depends_on": [], "needs_materials": ["MAT-5"], "early_start": "2026-07-28"},
+    {"id": "ACT-2", "name": "Structural steel erection (roof + mezzanine)", "duration_days": 14, "depends_on": ["ACT-1"], "needs_materials": ["MAT-1"], "early_start": "2026-08-10"},
+    {"id": "ACT-3", "name": "Roof deck + waterproofing", "duration_days": 7, "depends_on": ["ACT-2"], "needs_materials": [], "early_start": "2026-08-24"},
+    {"id": "ACT-4", "name": "Electrical room fit-out", "duration_days": 6, "depends_on": ["ACT-3"], "needs_materials": [], "early_start": "2026-08-31"},
+    {"id": "ACT-5", "name": "Switchgear installation", "duration_days": 8, "depends_on": ["ACT-4"], "needs_materials": ["MAT-2"], "early_start": "2026-09-06"},
+    {"id": "ACT-6", "name": "Busway installation", "duration_days": 5, "depends_on": ["ACT-5"], "needs_materials": ["MAT-8"], "early_start": "2026-09-14"},
+    {"id": "ACT-7", "name": "Generator placement + hookup", "duration_days": 7, "depends_on": ["ACT-4"], "needs_materials": ["MAT-6"], "early_start": "2026-09-06"},
+    {"id": "ACT-8", "name": "Power cabling pulls + terminations", "duration_days": 10, "depends_on": ["ACT-6", "ACT-7"], "needs_materials": ["MAT-4"], "early_start": "2026-09-19"},
+    {"id": "ACT-9", "name": "CRAC unit installation", "duration_days": 6, "depends_on": ["ACT-3"], "needs_materials": ["MAT-3"], "early_start": "2026-08-31"},
+    {"id": "ACT-10", "name": "Fire suppression install", "duration_days": 6, "depends_on": ["ACT-9"], "needs_materials": ["MAT-7"], "early_start": "2026-09-08"},
+    {"id": "ACT-11", "name": "Integrated systems testing (IST)", "duration_days": 10, "depends_on": ["ACT-8", "ACT-10"], "needs_materials": [], "early_start": "2026-09-29"},
+    {"id": "ACT-12", "name": "Commissioning + HANDOVER", "duration_days": 5, "depends_on": ["ACT-11"], "needs_materials": [], "early_start": "2026-10-09"}
+  ]
+}
