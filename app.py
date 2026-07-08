@@ -390,12 +390,53 @@ h1, h2, h3 {{
     color: rgba(138,143,160,0.6) !important;
 }}
 
+/* ===== SLIPPED CARD ===== */
+@keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.slipped-card-container {
+    background: linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.015) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    animation: cardSlideIn 250ms cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+    transition: all 200ms ease;
+}
+.slipped-card-container:hover {
+    border-color: rgba(224,90,80,0.3);
+    box-shadow: 0 0 0 1px rgba(224,90,80,0.15), 0 6px 22px rgba(0,0,0,0.4);
+}
+.pulse-badge {
+    animation: pulse-soft 1.8s ease-in-out infinite;
+}
+
+@property --num {
+    syntax: '<integer>';
+    initial-value: 0;
+    inherits: false;
+}
+@keyframes countUp {
+    from { --num: 0; }
+    to { --num: var(--target); }
+}
+.count-up-days {
+    animation: countUp 1.2s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+    counter-reset: num var(--num);
+    display: inline-block;
+}
+.count-up-days::after {
+    content: counter(num) " days";
+}
+
 /* ===== EXPANDER OVERRIDES ===== */
-.streamlit-expanderHeader {{
+.streamlit-expanderHeader {
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 600;
     color: {TEXT} !important;
-}}
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -451,9 +492,11 @@ with tab_sim:
           </div></div>""", unsafe_allow_html=True)
 
     # -------------------------------------------------------- graph toolbar
-    import networkx as nx
-
-    st.markdown("""<div style="margin-top:.4rem"></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="display:flex;align-items:center;gap:.5rem;margin:.6rem 0 .3rem">
+        <span style="font-size:.65rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:{STEEL}">
+        GRAPH CONTROLS</span>
+        <span style="flex:1;height:1px;background:{BORDER}"></span>
+    </div>""", unsafe_allow_html=True)
     toolbar_cols = st.columns([1.2, 1.2, 1.2, 1.4, 2])
     with toolbar_cols[0]:
         show_suppliers = st.checkbox("Suppliers", value=True, key="gf_sup")
