@@ -48,6 +48,10 @@ ICONS = {
     "alert": f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{RED}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
     "shield": f'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{GREEN}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
     "wrench": f'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{AMBER}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    "clock": f'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+    "bell": f'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{AMBER}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+    "bell-off": f'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{MUTED}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.4.6 4.2 1.2 5.5M17.6 17.6C17 18.2 12 21 12 21H6s3-2 3-9c0-.2 0-.5.02-.7"/><line x1="2" y1="2" x2="22" y2="22"/></svg>',
+    "check": f'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{GREEN}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
 }
 
 
@@ -823,52 +827,19 @@ with tab_sim:
                     mat_conf = r.confidence
                     mat_source = r.confidence_source
 
-                # Calculate days/hours remaining until deadline (new_finish)
-                import datetime
-                target_date = datetime.date.fromisoformat(e['new_finish'])
-                current_date = datetime.date.today()
-                delta = target_date - current_date
-                days_left = delta.days
-                if days_left < 0:
-                    days_left = 0
-                    hours_left = 0
-                else:
-                    # Deterministic mock hours based on hash of activity ID and day
-                    hours_left = (hash(act_id) % 24)
-
-                # Timer color thresholds
-                if days_left < 2:
-                    timer_color = RED
-                    timer_bg = "rgba(224,90,80,0.12)"
-                    timer_border = "rgba(224,90,80,0.3)"
-                elif days_left < 7:
-                    timer_color = AMBER
-                    timer_bg = "rgba(245,166,35,0.12)"
-                    timer_border = "rgba(245,166,35,0.3)"
-                else:
-                    timer_color = STEEL_BRIGHT
-                    timer_bg = "rgba(107,125,147,0.12)"
-                    timer_border = "rgba(107,125,147,0.3)"
-
                 # Bell icon toggle state
                 bell_key = f"bell_{act_id}"
                 if bell_key not in st.session_state:
                     st.session_state[bell_key] = True
                 
                 bell_active = st.session_state[bell_key]
-                bell_icon = "🔔" if bell_active else "🔕"
 
                 # Slipped card HTML container
                 st.markdown(f"""
                 <div class="slipped-card-container">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
                         <span style="font-family:'Space Grotesk'; font-weight:800; font-size:1.15rem; color:{TEXT};">{act_id}</span>
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                            <div style="background:{timer_bg}; border:1px solid {timer_border}; border-radius:6px; padding:0.18rem 0.5rem; font-family:'Space Grotesk'; font-size:0.8rem; color:{timer_color}; font-weight:700; display:inline-flex; align-items:center; gap:0.25rem;">
-                                ⏱️ {days_left}d:{hours_left}h
-                            </div>
-                            <span class="badge red pulse-badge">CRITICAL SLIP</span>
-                        </div>
+                        <span class="badge red pulse-badge">CRITICAL SLIP</span>
                     </div>
                     <div style="font-size:0.95rem; font-weight:600; color:{TEXT}; margin-bottom:0.7rem; line-height:1.2;">{e['name']}</div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:0.7rem; margin-bottom:0.7rem;">
@@ -895,28 +866,28 @@ with tab_sim:
                         note_text = reminder_data['note']
                         note_short = f" ({note_text[:12]}...)" if note_text else ""
                         st.markdown(f"""
-                        <div style="display:inline-flex; align-items:center; background:rgba(245,166,35,0.08); border:1px solid rgba(245,166,35,0.25); border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem; color:{AMBER}; font-weight:600; margin-bottom:0.5rem; width:100%;">
-                            ⏰ Reminder: {reminder_data['date'].strftime('%b %d')} @ {reminder_data['time'].strftime('%H:%M')}{note_short}
+                        <div style="display:inline-flex; align-items:center; gap:.4rem; background:rgba(245,166,35,0.08); border:1px solid rgba(245,166,35,0.25); border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem; color:{AMBER}; font-weight:600; margin-bottom:0.5rem; width:100%;">
+                            {svg("bell")} Reminder: {reminder_data['date'].strftime('%b %d')} @ {reminder_data['time'].strftime('%H:%M')}{note_short}
                         </div>
                         """, unsafe_allow_html=True)
-                        
+
                         btn_col1, btn_col2 = st.columns(2)
                         with btn_col1:
-                            if st.button("✏️ Edit", key=f"edit_btn_{act_id}", use_container_width=True):
+                            if st.button("Edit", key=f"edit_btn_{act_id}", use_container_width=True):
                                 st.session_state[f"show_form_{act_id}"] = True
                                 st.rerun()
                         with btn_col2:
-                            if st.button("🗑️ Dismiss", key=f"dismiss_btn_{act_id}", use_container_width=True):
+                            if st.button("Dismiss", key=f"dismiss_btn_{act_id}", use_container_width=True):
                                 st.session_state.reminders.pop(act_id, None)
                                 st.rerun()
                     else:
                         if not st.session_state.get(f"show_form_{act_id}"):
-                            if st.button("⏰ Set Reminder", key=f"set_btn_{act_id}", use_container_width=True):
+                            if st.button("Set Reminder", key=f"set_btn_{act_id}", use_container_width=True):
                                 st.session_state[f"show_form_{act_id}"] = True
                                 st.rerun()
-                
+
                 with action_col2:
-                    if st.button(bell_icon, key=f"bell_btn_{act_id}", use_container_width=True):
+                    if st.button("On" if bell_active else "Off", key=f"bell_btn_{act_id}", use_container_width=True, help="Toggle notifications"):
                         st.session_state[bell_key] = not bell_active
                         st.rerun()
 
@@ -961,7 +932,7 @@ with tab_sim:
                 st.markdown(f"""
                 <div class="absorbed-item">
                     <span style="font-family:'Space Grotesk'; font-weight:700; color:{GREEN}; font-size:1.05rem; display:inline-flex; align-items:center; gap:0.35rem; width:80px; flex-shrink:0;">
-                        ✓ {e['activity']}
+                        {svg("check")} {e['activity']}
                     </span>
                     <span style="color:{TEXT}; font-size:0.88rem; font-weight:500; line-height:1.2;">
                         {e['name']}
