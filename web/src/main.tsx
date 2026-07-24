@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
@@ -11,10 +10,11 @@ import "@fontsource/space-grotesk/700.css";
 import "./index.css";
 import App from "./App";
 
+// NOTE: intentionally not wrapped in React.StrictMode — its dev-only double
+// mount makes React Flow measure a 0-size container and render blank until a
+// resize/refresh. StrictMode has no effect on production builds anyway.
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
 );

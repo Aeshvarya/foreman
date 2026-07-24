@@ -98,6 +98,9 @@ export default function GraphCanvas({
         fitView fitViewOptions={{ padding: 0.12 }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
         onNodeClick={(_, node) => { if (materialIds.has(node.id)) onSelectMaterial?.(node.id); }}
+        // Re-fit after the container has actually painted — prevents the
+        // "blank until resize/refresh" race where RF measures a 0-size box.
+        onInit={(inst) => { setTimeout(() => inst.fitView({ padding: 0.12 }), 60); }}
         proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.4}>
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,0.05)" />
         <Panel position="top-left" className="!m-4 flex flex-col gap-2">
