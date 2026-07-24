@@ -12,7 +12,11 @@ langchain>=1.0
 langchain-core>=1.0
 langchain-google-genai>=4.0
 
-# UI
+# API (web frontend backend)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+
+# Legacy Streamlit UI (kept as fallback)
 streamlit>=1.30
 plotly>=5.18
 pandas>=2.0
