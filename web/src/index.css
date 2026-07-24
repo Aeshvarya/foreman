@@ -81,6 +81,23 @@ body::after {
 
 ::selection { background: rgba(245, 166, 35, 0.28); color: #fff; }
 
+/* React Flow edges — dim structure vs the glowing critical path. */
+.react-flow__edge.fm-dim .react-flow__edge-path {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 1.2;
+}
+.react-flow__edge.fm-hot .react-flow__edge-path {
+  stroke: var(--amber);
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 5px rgba(245, 166, 35, 0.75));
+}
+.react-flow__edge.fm-hot.animated .react-flow__edge-path {
+  stroke-dasharray: 6 4;
+  animation: dashflow 0.7s linear infinite;
+}
+@keyframes dashflow { to { stroke-dashoffset: -20; } }
+.react-flow__renderer { z-index: 2; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
