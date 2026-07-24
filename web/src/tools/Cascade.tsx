@@ -69,9 +69,10 @@ export default function Cascade() {
         )}
       </div>
 
-      {/* THE GRAPH — the star, full width */}
+      {/* THE GRAPH — the star, full width. Click a material node to slip it. */}
       {project && (
-        <GraphCanvas project={project} delayedId={matId} slippedIds={slippedIds} handoverBreaks={breaks} />
+        <GraphCanvas project={project} delayedId={matId} slippedIds={slippedIds}
+          handoverBreaks={breaks} onSelectMaterial={setMatId} />
       )}
 
       {/* details row */}
