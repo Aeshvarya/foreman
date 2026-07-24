@@ -29,6 +29,15 @@ except ImportError:
     from graph import ACTIVITY, MATERIAL, SUPPLIER, build_graph, graph_summary  # type: ignore
     from risk import risk_radar  # type: ignore
 
+
+def _ask_brain(question: str):
+    """Lazy bridge to the NL query agent so the app boots even without a key."""
+    try:
+        from src.agents.query_agent import ask  # type: ignore
+    except ImportError:
+        from agents.query_agent import ask  # type: ignore
+    return ask(question)
+
 # ----------------------------------------------------------------- brand
 BG = "#0D0F12"
 SURFACE = "rgba(255,255,255,0.04)"
@@ -497,7 +506,8 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-tab_sim, tab_radar = st.tabs(["Delay Cascade Simulator", "Risk Radar"])
+tab_sim, tab_radar, tab_ask = st.tabs(
+    ["Delay Cascade Simulator", "Risk Radar", "Ask Foreman"])
 
 # ------------------------------------------------------------ simulator
 with tab_sim:
@@ -971,3 +981,81 @@ with tab_radar:
             <i>({rr.confidence_source})</i> · risk score <b>{rr.risk_score}</b></div>
           <div class="meter"><div style="width:{pct}%;background:{bar_color}"></div></div>
         </div>""", unsafe_allow_html=True)
+
+
+# ------------------------------------------------------------------ Ask Foreman
+with tab_ask:
+    st.markdown(
+        f'<div style="color:{MUTED};font-size:.9rem;margin:.2rem 0 1rem">'
+        f'Ask about the project in plain English. Foreman writes a Cypher query '
+        f'against the knowledge graph, runs it, and answers — you can watch every '
+        f'step it takes.</div>', unsafe_allow_html=True)
+
+    examples = [
+        "Which materials have confidence below 0.75?",
+        "If the diesel generators are delayed, what activities are affected?",
+        "Who supplies the switchgear and when does it arrive?",
+    ]
+    st.markdown(
+        '<div style="color:#6B7D93;font-size:.72rem;text-transform:uppercase;'
+        'letter-spacing:.14em;margin-bottom:.4rem">try asking</div>',
+        unsafe_allow_html=True)
+    ex_cols = st.columns(len(examples))
+    picked = None
+    for col, ex in zip(ex_cols, examples):
+        if col.button(ex, key=f"ex_{ex}"):
+            picked = ex
+
+    if "chat" not in st.session_state:
+        st.session_state.chat = []
+
+    typed = st.chat_input("Ask Foreman about the project…")
+    question = picked or typed
+
+    # Render history first (older on top).
+    for turn in st.session_state.chat:
+        with st.chat_message("user"):
+            st.markdown(turn["q"])
+        with st.chat_message("assistant"):
+            st.markdown(turn["answer"])
+            if turn.get("citations"):
+                chips = " ".join(
+                    f'<span class="badge orange">{c}</span>' for c in turn["citations"])
+                st.markdown(f'<div style="margin-top:.4rem">{chips}</div>',
+                            unsafe_allow_html=True)
+            with st.expander("🧠 reasoning trace"):
+                for step in turn["trace"]:
+                    st.markdown(
+                        f'<div class="card" style="margin-bottom:.4rem"><div class="hd">'
+                        f'{step["step"]}</div><code style="color:#8BA3BD;font-size:.8rem;'
+                        f'white-space:pre-wrap">{step["detail"]}</code></div>',
+                        unsafe_allow_html=True)
+
+    if question:
+        with st.chat_message("user"):
+            st.markdown(question)
+        with st.chat_message("assistant"):
+            try:
+                with st.spinner("reasoning over the graph…"):
+                    res = _ask_brain(question)
+                st.markdown(res["answer"])
+                if res.get("citations"):
+                    chips = " ".join(
+                        f'<span class="badge orange">{c}</span>' for c in res["citations"])
+                    st.markdown(f'<div style="margin-top:.4rem">{chips}</div>',
+                                unsafe_allow_html=True)
+                with st.expander("🧠 reasoning trace", expanded=True):
+                    for step in res.get("trace", []):
+                        st.markdown(
+                            f'<div class="card" style="margin-bottom:.4rem"><div class="hd">'
+                            f'{step["step"]}</div><code style="color:#8BA3BD;font-size:.8rem;'
+                            f'white-space:pre-wrap">{step["detail"]}</code></div>',
+                            unsafe_allow_html=True)
+                st.session_state.chat.append({
+                    "q": question, "answer": res["answer"],
+                    "citations": res.get("citations", []), "trace": res.get("trace", []),
+                })
+            except Exception as e:
+                st.error(
+                    "The reasoning agent isn't available. Make sure GEMINI_API_KEY "
+                    f"is set in .env and Neo4j is running.\n\n{e}")
