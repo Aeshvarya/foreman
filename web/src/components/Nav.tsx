@@ -21,7 +21,7 @@ export default function Nav() {
   return (
     <div className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
       <nav className={cn(
-        "flex w-full max-w-[1200px] items-center justify-between rounded-xl px-5 py-3 transition-all duration-300",
+        "flex w-full max-w-[1560px] items-center justify-between rounded-xl px-5 py-3 transition-all duration-300",
         scrolled ? "glass shadow-panel" : "border border-transparent",
       )}>
         <Wordmark />

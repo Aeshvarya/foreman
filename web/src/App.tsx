@@ -1,13 +1,17 @@
 import { Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
+import ChatWidget from "./components/ChatWidget";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/dashboard/:tool" element={<Dashboard />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/:tool" element={<Dashboard />} />
+      </Routes>
+      <ChatWidget />
+    </>
   );
 }

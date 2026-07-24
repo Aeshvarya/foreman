@@ -48,7 +48,7 @@ export default function Landing() {
       <Nav />
 
       {/* ---------------------------------------------------------- HERO */}
-      <section className="mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-8 px-6 pb-28 pt-40 lg:grid-cols-[1.05fr_0.95fr] lg:pt-48">
+      <section className="mx-auto grid max-w-[1560px] grid-cols-1 items-center gap-8 px-6 pb-28 pt-40 lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:px-12 lg:pt-48">
         <div>
           <Kicker className="mb-6">Kaya AI Hackathon · Track: Supply Chain · Team Gozers</Kicker>
           <h1 className="font-display text-[3.4rem] font-bold leading-[0.94] tracking-tight sm:text-7xl">
@@ -75,9 +75,9 @@ export default function Landing() {
               ))}
           </div>
         </div>
-        <div className="relative h-[380px] lg:h-[480px]">
+        <div className="relative h-[420px] lg:h-[600px]">
           <div className="absolute inset-0 rounded-2xl" style={{
-            background: "radial-gradient(circle at 60% 45%, rgba(245,166,35,0.08), transparent 60%)" }} />
+            background: "radial-gradient(circle at 60% 45%, rgba(245,166,35,0.1), transparent 62%)" }} />
           <HeroGraph />
         </div>
       </section>
@@ -196,7 +196,7 @@ export default function Landing() {
       </Section>
 
       {/* -------------------------------------------------------- FOOTER */}
-      <footer className="mx-auto max-w-[1200px] px-6 pb-16 pt-24">
+      <footer className="mx-auto max-w-[1560px] px-6 pb-16 pt-24">
         <Reveal>
           <div className="rounded-2xl border border-line bg-gradient-to-b from-white/[0.04] to-transparent p-10 text-center sm:p-16">
             <h2 className="font-display text-3xl font-bold sm:text-5xl">See the brain reason.</h2>
@@ -219,7 +219,7 @@ export default function Landing() {
 
 function Section({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="mx-auto max-w-[1200px] scroll-mt-24 px-6 py-20 sm:py-28">
+    <section id={id} className="mx-auto max-w-[1560px] scroll-mt-24 px-6 py-20 sm:py-28">
       {children}
     </section>
   );

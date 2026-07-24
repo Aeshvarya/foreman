@@ -31,14 +31,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-3 px-1">
-        <div className="flex items-center gap-2 px-2">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-green" />
-          </span>
-          <span className="kicker">Live · Neo4j + Gemini</span>
-        </div>
+      <div className="mt-auto px-1">
         <NavLink to="/" className="flex items-center gap-2 px-2 text-sm text-faint hover:text-muted">
           <ArrowLeft size={14} /> Back to site
         </NavLink>
