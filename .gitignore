@@ -7,3 +7,6 @@ __pycache__/
 
 # user projects (runtime, seeded from data/project.json)
 data/projects/
+
+# private LaTeX study notebook (not for public repo)
+study/
