@@ -88,9 +88,17 @@ Then open **http://localhost:5173**. (The legacy Streamlit prototype still runs 
 **Backend:** Python · **FastAPI** · **Neo4j** (Cypher) · **LangGraph** · **Gemini**
 (via langchain-google-genai) · NetworkX (CPM) · NumPy (Monte-Carlo) · Docker
 
+## Your own projects — no JSON
+
+Open the dashboard → **New Project** (or the project switcher in the sidebar) to build a
+project from a guided form: suppliers, materials (supplier + dates + confidence), and a
+schedule where each activity picks the materials it needs and the activities it depends on.
+Hit **Create & launch** and the whole app — graph, cascade, risk radar, chat — runs on it.
+Switch between projects any time. Projects are stored under `data/projects/`.
+
 ## Demo data
 
-`data/project.json` — **Sunrise DC-1**, a synthetic 12MW data-center build (8 materials, 6 suppliers, 12 activities → handover). `data/docs/` — the raw document corpus the KG Builder ingests. `data/market_suppliers.json` — the alternate-supplier catalog. All synthetic, modeled on real construction supply-chain structures.
+`data/project.json` — **Sunrise DC-1**, a synthetic 12MW data-center build (8 materials, 6 suppliers, 12 activities → handover), auto-seeded as the first project. `data/docs/` — the raw document corpus the KG Builder ingests. `data/market_suppliers.json` — the alternate-supplier catalog. All synthetic, modeled on real construction supply-chain structures.
 
 ## How it extends Kaya
 
