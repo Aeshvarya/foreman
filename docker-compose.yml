@@ -1,0 +1,25 @@
+# Neo4j for Foreman — the construction knowledge graph store.
+# Start:  docker compose up -d
+# Browser: http://localhost:7474  (user: neo4j / pass: foreman123)
+# Bolt:    bolt://localhost:7687
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: foreman-neo4j
+    ports:
+      - "7474:7474"   # HTTP browser
+      - "7687:7687"   # Bolt driver
+    environment:
+      - NEO4J_AUTH=neo4j/foreman123
+      - NEO4J_server_memory_pagecache_size=256M
+      - NEO4J_server_memory_heap_max__size=512M
+    volumes:
+      - foreman_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  foreman_neo4j_data:
