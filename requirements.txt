@@ -1,4 +1,18 @@
+# Core graph + CPM engine
 networkx>=3.0
+numpy>=2.0
+
+# Neo4j knowledge graph
+neo4j>=6.0
+python-dotenv>=1.0
+
+# Agent layer (LangGraph + Gemini free tier)
+langgraph>=1.0
+langchain>=1.0
+langchain-core>=1.0
+langchain-google-genai>=4.0
+
+# UI
 streamlit>=1.30
 plotly>=5.18
 pandas>=2.0
