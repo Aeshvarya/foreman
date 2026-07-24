@@ -4,6 +4,7 @@ Run:  streamlit run app.py
 """
 
 import base64
+import datetime
 import sys
 from pathlib import Path
 
@@ -31,12 +32,12 @@ except ImportError:
 
 
 def _ask_brain(question: str):
-    """Lazy bridge to the NL query agent so the app boots even without a key."""
+    """Lazy bridge to the brain router so the app boots even without a key."""
     try:
-        from src.agents.query_agent import ask  # type: ignore
+        from src.agents.brain import answer  # type: ignore
     except ImportError:
-        from agents.query_agent import ask  # type: ignore
-    return ask(question)
+        from agents.brain import answer  # type: ignore
+    return answer(question)
 
 # ----------------------------------------------------------------- brand
 BG = "#0D0F12"
