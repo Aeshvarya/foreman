@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ Mission-Critical Command Center — design tokens ============ */
+:root {
+  --bg: #08090b;
+  --bg-elev: #0e1014;
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.055);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #edeef0;
+  --muted: #8a8f98;
+  --faint: #565b66;
+  --amber: #f5a623;
+  --amber-bright: #ffb93d;
+  --red: #e5484d;
+  --green: #46a758;
+  --steel: #6b7d93;
+  --steel-bright: #8ba3bd;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Geist Variable", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Film-grain + ambient glow — the cinematic depth of the command center.
+   Fixed, non-interactive, cheap. This texture is a signature, not decoration. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(245, 166, 35, 0.06), transparent 60%),
+    radial-gradient(700px 500px at 100% 0%, rgba(107, 125, 147, 0.05), transparent 55%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#root { position: relative; z-index: 1; }
+
+/* Instrument micro-label — the mono uppercase treatment used everywhere. */
+.kicker {
+  font-family: "Geist Mono Variable", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.hairline { border: 1px solid var(--border); }
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+::selection { background: rgba(245, 166, 35, 0.28); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
