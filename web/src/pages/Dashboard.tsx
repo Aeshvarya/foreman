@@ -1,14 +1,53 @@
-import { Wordmark } from "../components/primitives";
+import { useParams } from "react-router-dom";
+import Sidebar from "../components/dashboard/Sidebar";
+import { useProject } from "../lib/useProject";
+import Cascade from "../tools/Cascade";
+import Radar from "../tools/Radar";
+import Ask from "../tools/Ask";
+import Build from "../tools/Build";
+
+const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
+  cascade: { title: "Delay Cascade Simulator", sub: "Slip a material and watch what breaks.", el: Cascade },
+  radar: { title: "Risk Radar", sub: "Every material's breaking point, crossed with confidence.", el: Radar },
+  ask: { title: "Ask Foreman", sub: "Query the project in plain English — watch it reason.", el: Ask },
+  build: { title: "Build from Docs", sub: "Construct the graph from raw project documents.", el: Build },
+};
 
 export default function Dashboard() {
+  const { tool = "cascade" } = useParams();
+  const { project } = useProject();
+  const active = TOOLS[tool] ?? TOOLS.cascade;
+  const Tool = active.el;
+
   return (
-    <div className="min-h-screen">
-      <header className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-5">
-        <Wordmark />
-      </header>
-      <div className="mx-auto max-w-[1200px] px-6 py-20 text-muted">
-        Dashboard — coming in the next phase.
-      </div>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-x-hidden">
+        <header className="flex items-center justify-between border-b border-line px-8 py-5">
+          <div>
+            <h1 className="font-display text-xl font-bold">{active.title}</h1>
+            <p className="mt-0.5 text-sm text-muted">{active.sub}</p>
+          </div>
+          {project && (
+            <div className="hidden items-center gap-6 md:flex">
+              {[
+                [project.counts.suppliers, "suppliers"],
+                [project.counts.materials, "materials"],
+                [project.counts.activities, "activities"],
+                [project.counts.edges, "graph edges"],
+              ].map(([v, l]) => (
+                <div key={l} className="text-right">
+                  <div className="font-display text-lg font-bold leading-none">{v}</div>
+                  <div className="kicker mt-1">{l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </header>
+        <div className="px-8 py-7">
+          <Tool />
+        </div>
+      </main>
     </div>
   );
 }
