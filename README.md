@@ -68,23 +68,25 @@ Neo4j is the source of truth and the surface the query agent targets; a NetworkX
 ## Run it
 
 ```bash
-# 1. Neo4j
-docker compose up -d
-
-# 2. Python env
+# 1. Python env + Gemini key (free — https://aistudio.google.com/apikey)
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
+cp .env.example .env    # paste your key into GEMINI_API_KEY
 
-# 3. Gemini key (free — https://aistudio.google.com/apikey)
-cp .env.example .env    # then paste your key into GEMINI_API_KEY
+# 2. Frontend deps
+cd web && npm install && cd ..
 
-# 4. Load the graph + run
-./.venv/bin/python -m src.db --load
-./.venv/bin/streamlit run app.py
+# 3. Start everything (Neo4j + API :8000 + web :5173)
+./dev.sh
 ```
+
+Then open **http://localhost:5173**. (The legacy Streamlit prototype still runs via
+`./.venv/bin/streamlit run app.py` if needed.)
 
 ## Tech stack
 
-Python · **Neo4j** (Cypher) · **LangGraph** · **Gemini** (via langchain-google-genai) · NetworkX (CPM) · NumPy (Monte-Carlo) · Streamlit + Plotly · Docker
+**Frontend:** React + TypeScript + Vite · Tailwind · Framer Motion · React Flow
+**Backend:** Python · **FastAPI** · **Neo4j** (Cypher) · **LangGraph** · **Gemini**
+(via langchain-google-genai) · NetworkX (CPM) · NumPy (Monte-Carlo) · Docker
 
 ## Demo data
 
