@@ -13,14 +13,16 @@ from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Make src/ importable so the brain modules' bare imports resolve.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from db import get_graph                       # noqa: E402
+import time
+
+from db import get_graph, load_to_neo4j        # noqa: E402
 from cascade import run_cascade                # noqa: E402
 from risk import risk_radar                    # noqa: E402
 from montecarlo import simulate                # noqa: E402
@@ -28,6 +30,7 @@ from alt_supplier import recommend             # noqa: E402
 from agents.brain import answer as brain_answer          # noqa: E402
 from agents.kg_builder import build_graph_from_docs      # noqa: E402
 from graph import MATERIAL, SUPPLIER, ACTIVITY           # noqa: E402
+import projects                                          # noqa: E402
 
 app = FastAPI(title="Foreman API", version="2.0")
 
@@ -36,6 +39,23 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_methods=["*"], allow_headers=["*"],
 )
+
+
+def _load_active_into_neo4j(retries: int = 8) -> None:
+    """Push the active project into Neo4j (retry while Neo4j warms up)."""
+    for i in range(retries):
+        try:
+            load_to_neo4j(projects.get_active_project())
+            return
+        except Exception as e:
+            if i == retries - 1:
+                print(f"[startup] could not load project into Neo4j: {e}")
+            time.sleep(2)
+
+
+@app.on_event("startup")
+def _startup():
+    _load_active_into_neo4j()
 
 
 def _jsonable(obj):
@@ -131,3 +151,40 @@ def ask(req: AskReq):
 @app.post("/api/build-graph")
 def build_graph():
     return _jsonable(build_graph_from_docs(write=True))
+
+
+# ------------------------------------------------------------ projects
+@app.get("/api/projects")
+def projects_list():
+    return projects.list_projects()
+
+
+@app.post("/api/projects")
+def projects_create(data: dict):
+    """Create a project from user-entered data, make it active, load it."""
+    try:
+        pid = projects.create_project(data)
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, f"Invalid project: {e}")
+    load_to_neo4j(projects.get_active_project())
+    return {"id": pid, "active": pid}
+
+
+@app.post("/api/projects/{pid}/activate")
+def projects_activate(pid: str):
+    try:
+        projects.set_active(pid)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    load_to_neo4j(projects.get_active_project())
+    return {"active": pid}
+
+
+@app.delete("/api/projects/{pid}")
+def projects_delete(pid: str):
+    try:
+        projects.delete_project(pid)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    load_to_neo4j(projects.get_active_project())
+    return {"active": projects.get_active_id()}
