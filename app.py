@@ -39,6 +39,34 @@ def _ask_brain(question: str):
         from agents.brain import answer  # type: ignore
     return answer(question)
 
+
+@st.cache_data(show_spinner=False)
+def _monte_carlo():
+    """Project-level schedule risk (cached — deterministic, seeded)."""
+    try:
+        from src.montecarlo import simulate  # type: ignore
+    except ImportError:
+        from montecarlo import simulate  # type: ignore
+    r = simulate()
+    return {"p_slip": r.p_slip, "mean": r.mean_slip, "p90": r.p90_slip,
+            "baseline": r.baseline_handover, "drivers": r.drivers}
+
+
+def _alt_suppliers(material_id: str):
+    try:
+        from src.alt_supplier import recommend  # type: ignore
+    except ImportError:
+        from alt_supplier import recommend  # type: ignore
+    return recommend(material_id)
+
+
+def _build_from_docs():
+    try:
+        from src.agents.kg_builder import build_graph_from_docs  # type: ignore
+    except ImportError:
+        from agents.kg_builder import build_graph_from_docs  # type: ignore
+    return build_graph_from_docs(write=True)
+
 # ----------------------------------------------------------------- brand
 BG = "#0D0F12"
 SURFACE = "rgba(255,255,255,0.04)"
@@ -507,8 +535,8 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-tab_sim, tab_radar, tab_ask = st.tabs(
-    ["Delay Cascade Simulator", "Risk Radar", "Ask Foreman"])
+tab_sim, tab_radar, tab_ask, tab_build = st.tabs(
+    ["Delay Cascade Simulator", "Risk Radar", "Ask Foreman", "Build from Docs"])
 
 # ------------------------------------------------------------ simulator
 with tab_sim:
@@ -955,8 +983,49 @@ with tab_sim:
                 f'{svg("wrench")} &nbsp;{r.mitigation}</div>',
                 unsafe_allow_html=True)
 
+    # Alternate-supplier fallback — surfaced only when the handover actually breaks.
+    if r.handover_slip_days > 0:
+        try:
+            alt = _alt_suppliers(mat_id)
+            feasible = [a for a in alt["alternates"] if a.get("meets_roj")]
+            if feasible:
+                rows = "".join(
+                    f'<div style="display:flex;justify-content:space-between;'
+                    f'padding:.35rem 0;border-top:1px solid {BORDER}">'
+                    f'<span style="color:{TEXT};font-weight:600">{a["name"]}</span>'
+                    f'<span style="color:{MUTED};font-size:.82rem">'
+                    f'{a["region"]} · {a["reliability"]:.0%} reliable · '
+                    f'{a["lead_days"]}d lead <span class="badge green">meets ROJ</span>'
+                    f'</span></div>'
+                    for a in feasible)
+                st.markdown(
+                    f'<div class="card mitig"><div class="hd">alternate supply '
+                    f'({alt.get("days_to_roj")} days to ROJ)</div>'
+                    f'<div style="color:{MUTED};font-size:.84rem;margin-bottom:.3rem">'
+                    f'A full re-order is too slow this late — these bridge options '
+                    f'can still hit the required-on-job date:</div>{rows}</div>',
+                    unsafe_allow_html=True)
+        except Exception:
+            pass  # never break the hero tab over a fallback panel
+
 # ------------------------------------------------------------ risk radar
 with tab_radar:
+    # Project-level Monte-Carlo schedule risk (headline read).
+    try:
+        mc = _monte_carlo()
+        top = mc["drivers"][0] if mc["drivers"] else None
+        driver_txt = (f"{top['name']} (MAT driver)" if top and top["risk_contribution"] > 0
+                      else "no single dominant driver")
+        st.markdown(f"""
+        <div class="verdict {'breaks' if mc['p_slip'] >= 0.25 else 'safe'}"
+             style="margin-top:.8rem">
+          {svg('alert') if mc['p_slip'] >= 0.25 else svg('shield')}
+          <div>Monte-Carlo: <b>{mc['p_slip']:.0%}</b> chance the handover slips
+            <small>across 3,000 simulations · expected {mc['mean']}d, P90 {mc['p90']}d
+            · biggest driver: {driver_txt}</small></div>
+        </div>""", unsafe_allow_html=True)
+    except Exception:
+        pass
     st.markdown(f"<p style='color:{MUTED};margin-top:.6rem'>Foreman probes every "
                 "material's <b>breaking point</b> (minimum slip that kills the "
                 "handover) and crosses it with <b>status confidence</b>. "
@@ -1060,3 +1129,62 @@ with tab_ask:
                 st.error(
                     "The reasoning agent isn't available. Make sure GEMINI_API_KEY "
                     f"is set in .env and Neo4j is running.\n\n{e}")
+
+
+# ------------------------------------------------------------------ Build from Docs
+with tab_build:
+    st.markdown(
+        f'<div style="color:{MUTED};font-size:.9rem;margin:.2rem 0 1rem">'
+        f'Foreman doesn\'t need clean data. It reads the messy documents a real '
+        f'project generates — POs, supplier emails, GPS feeds, goods-received '
+        f'notes, submittal logs — and <b>builds the confidence-scored knowledge '
+        f'graph itself</b>, scoring every fact by how trustworthy its source is '
+        f'and flagging conflicts when documents disagree.</div>',
+        unsafe_allow_html=True)
+
+    if st.button("⚙  Build knowledge graph from documents", key="kg_build"):
+        with st.spinner("reading documents, extracting facts, resolving conflicts…"):
+            try:
+                res = _build_from_docs()
+                st.session_state.kg_res = res
+            except Exception as e:
+                st.error(f"Build failed — is GEMINI_API_KEY set and Neo4j running?\n\n{e}")
+
+    res = st.session_state.get("kg_res")
+    if res:
+        kc1, kc2, kc3 = st.columns(3)
+        kc1.markdown(f'<div class="kpi"><div class="v">{res["docs"]}</div>'
+                     f'<div class="l">documents read</div></div>', unsafe_allow_html=True)
+        kc2.markdown(f'<div class="kpi"><div class="v">{res["facts"]}</div>'
+                     f'<div class="l">facts extracted</div></div>', unsafe_allow_html=True)
+        kc3.markdown(f'<div class="kpi"><div class="v" style="color:{RED if res["conflicts"] else GREEN}">'
+                     f'{len(res["conflicts"])}</div><div class="l">conflicts caught</div></div>',
+                     unsafe_allow_html=True)
+
+        for c in res["conflicts"]:
+            kept, rej = c["kept"], c["rejected"][0]
+            st.markdown(
+                f'<div class="verdict breaks" style="margin:1rem 0 .6rem">'
+                f'{svg("alert")}<div>Conflict on {c["material"]} · {c["attribute"]}'
+                f'<small>kept <b>{kept["value"]}</b> ({kept["source"]}) over '
+                f'<b>{rej["value"]}</b> ({rej["source"]}) → confidence lowered to '
+                f'{c["confidence"]:.0%} and flagged for human check</small></div></div>',
+                unsafe_allow_html=True)
+
+        st.markdown(f'<div style="color:#6B7D93;font-size:.72rem;text-transform:uppercase;'
+                    f'letter-spacing:.14em;margin:1rem 0 .5rem">confidence built from source evidence</div>',
+                    unsafe_allow_html=True)
+        for mid, s in sorted(res["materials"].items()):
+            flag = ' <span class="badge red">conflict</span>' if s["conflict"] else ""
+            pct = int(s["confidence"] * 100)
+            bar = RED if pct < 70 else ("#C9AD28" if pct < 85 else GREEN)
+            st.markdown(f"""
+            <div class="risk-item">
+              <div class="t">{mid} <span style="color:{MUTED};font-weight:400">
+                · {s['confidence']:.0%} confidence</span>{flag}</div>
+              <div class="m">{s['confidence_source']}</div>
+              <div class="meter"><div style="width:{pct}%;background:{bar}"></div></div>
+            </div>""", unsafe_allow_html=True)
+
+        st.caption("Neo4j has been updated with these document-derived confidences, "
+                   "sources, and conflict flags.")
