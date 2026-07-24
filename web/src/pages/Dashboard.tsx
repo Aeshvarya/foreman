@@ -5,12 +5,14 @@ import Cascade from "../tools/Cascade";
 import Radar from "../tools/Radar";
 import Ask from "../tools/Ask";
 import Build from "../tools/Build";
+import NewProject from "../tools/NewProject";
 
 const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
   cascade: { title: "Delay Cascade Simulator", sub: "Slip a material and watch what breaks.", el: Cascade },
   radar: { title: "Risk Radar", sub: "Every material's breaking point, crossed with confidence.", el: Radar },
   ask: { title: "Ask Foreman", sub: "Query the project in plain English — watch it reason.", el: Ask },
   build: { title: "Build from Docs", sub: "Construct the graph from raw project documents.", el: Build },
+  new: { title: "New Project", sub: "Enter a project's data and start simulating — no files, no code.", el: NewProject },
 };
 
 export default function Dashboard() {

@@ -73,6 +73,16 @@ export interface BuildResult {
   trace: TraceStep[];
 }
 
+export interface ProjectMeta { id: string; name: string; created: string; active: boolean; seed?: boolean; }
+
+// Payload the New Project builder sends (ids pre-assigned by order).
+export interface NewProjectInput {
+  project: { name: string; start_date: string; handover_milestone?: string };
+  suppliers: { id: string; name: string; region?: string; reliability?: number }[];
+  materials: { id: string; name: string; supplier: string; expected_arrival: string; roj_date: string; confidence: number }[];
+  activities: { id: string; name: string; duration_days: number; needs_materials: string[]; depends_on: string[] }[];
+}
+
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(path);
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
@@ -83,6 +93,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `${path} → ${r.status}`);
+  return r.json();
+}
+async function del<T>(path: string): Promise<T> {
+  const r = await fetch(path, { method: "DELETE" });
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
   return r.json();
 }
@@ -97,4 +112,8 @@ export const api = {
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),
   ask: (question: string) => post<AskResult>("/api/ask", { question }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
+  projects: () => get<ProjectMeta[]>("/api/projects"),
+  createProject: (data: NewProjectInput) => post<{ id: string }>("/api/projects", data),
+  activateProject: (id: string) => post<{ active: string }>(`/api/projects/${id}/activate`, {}),
+  deleteProject: (id: string) => del<{ active: string }>(`/api/projects/${id}`),
 };

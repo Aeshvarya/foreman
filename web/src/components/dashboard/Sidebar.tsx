@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft } from "lucide-react";
 import { Wordmark } from "../primitives";
+import ProjectSwitcher from "./ProjectSwitcher";
 import { cn } from "../../lib/cn";
 
 const TOOLS = [
@@ -15,7 +16,12 @@ export default function Sidebar() {
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-line px-4 py-5">
       <div className="px-2"><Wordmark /></div>
 
-      <nav className="mt-9 flex flex-col gap-1">
+      <div className="mt-6">
+        <div className="kicker mb-2 px-2">Project</div>
+        <ProjectSwitcher />
+      </div>
+
+      <nav className="mt-7 flex flex-col gap-1">
         <div className="kicker px-2 pb-2">Tools</div>
         {TOOLS.map((t) => (
           <NavLink key={t.slug} to={`/dashboard/${t.slug}`}
