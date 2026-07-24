@@ -1,0 +1,39 @@
+{
+  "_note": "Synthetic market catalog of alternate/backup suppliers Foreman can fall back to when a primary supplier is at risk. Reliability 0-1, lead_days = typical fabrication+delivery lead time, region for logistics proximity.",
+  "categories": {
+    "electrical_switchgear": [
+      {"id": "MKT-E4", "name": "RentalPower Temporary LV Panels", "region": "north", "reliability": 0.78, "lead_days": 24, "note": "bridge rental while primary completes"},
+      {"id": "MKT-E1", "name": "PowerGrid Switchgear Co", "region": "north", "reliability": 0.88, "lead_days": 85},
+      {"id": "MKT-E2", "name": "ElectroMax LV Systems", "region": "west", "reliability": 0.83, "lead_days": 95},
+      {"id": "MKT-E3", "name": "Siemens-authorized Panel Builder", "region": "west", "reliability": 0.93, "lead_days": 100}
+    ],
+    "generators": [
+      {"id": "MKT-G4", "name": "PowerHire Rental Gensets", "region": "west", "reliability": 0.80, "lead_days": 18, "note": "rental bridge to keep commissioning on track"},
+      {"id": "MKT-G1", "name": "TitanPower Gensets", "region": "west", "reliability": 0.90, "lead_days": 70},
+      {"id": "MKT-G2", "name": "DieselCore India", "region": "south", "reliability": 0.85, "lead_days": 80},
+      {"id": "MKT-G3", "name": "Cummins-authorized Packager", "region": "north", "reliability": 0.94, "lead_days": 78}
+    ],
+    "power_cabling": [
+      {"id": "MKT-C1", "name": "Polycab Distribution", "region": "west", "reliability": 0.95, "lead_days": 25},
+      {"id": "MKT-C2", "name": "KEI Cables", "region": "north", "reliability": 0.92, "lead_days": 28}
+    ],
+    "hvac_cooling": [
+      {"id": "MKT-H1", "name": "ThermalEdge CRAC Systems", "region": "south", "reliability": 0.89, "lead_days": 55},
+      {"id": "MKT-H2", "name": "Blue Star Precision Cooling", "region": "west", "reliability": 0.92, "lead_days": 58}
+    ],
+    "structural_steel": [
+      {"id": "MKT-S1", "name": "JSW Structural Fabrication", "region": "west", "reliability": 0.9, "lead_days": 42},
+      {"id": "MKT-S2", "name": "Tata Structura", "region": "north", "reliability": 0.93, "lead_days": 40}
+    ],
+    "precast_concrete": [
+      {"id": "MKT-P1", "name": "Ultratech Precast", "region": "north", "reliability": 0.92, "lead_days": 22}
+    ],
+    "fire_suppression": [
+      {"id": "MKT-F1", "name": "Ceasefire NOVEC Systems", "region": "north", "reliability": 0.9, "lead_days": 48}
+    ],
+    "busway": [
+      {"id": "MKT-B1", "name": "Legrand Busbar Trunking", "region": "south", "reliability": 0.91, "lead_days": 38},
+      {"id": "MKT-B2", "name": "C&S Electric Busway", "region": "north", "reliability": 0.86, "lead_days": 44}
+    ]
+  }
+}
