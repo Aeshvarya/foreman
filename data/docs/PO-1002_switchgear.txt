@@ -1,0 +1,7 @@
+PURCHASE ORDER — PO-1002
+Project: Sunrise DC-1 (12MW Data Center, Jaipur)
+Supplier: VoltGear Switchgear Pvt Ltd (Pune)
+Item: 4000A LV switchgear lineup (MAT-2)
+Submittal: APPROVED
+Quoted lead time: 90 days from PO release.
+Required on job (ROJ): 2026-08-24.

@@ -1,0 +1,4 @@
+LOGISTICS TRACKING FEED (live GPS)
+Shipment: CRAC cooling units x8 (MAT-3), Supplier CoolFlow HVAC (Chennai)
+Status: IN TRANSIT. Last ping: NH-48 near Surat.
+Estimated arrival at Sunrise DC-1 site: 2026-08-13. Source: carrier GPS.

@@ -1,0 +1,10 @@
+From: dispatch@voltgear.co.in
+To: procurement@sunrise-dc.example
+Date: 2026-07-18
+Subject: RE: PO-1002 switchgear status
+
+Hi team, quick update on the 4000A switchgear lineup. Fabrication is
+progressing well on our Pune floor. We are on track to ship the week of
+August 20 and expect delivery to your Jaipur site around 2026-08-20.
+Will confirm dispatch once QA sign-off is complete.
+— VoltGear Dispatch

@@ -1,0 +1,5 @@
+INTERNAL ANALYTICS — Supplier queue model (auto-generated 2026-07-20)
+Material: MAT-2 4000A LV switchgear lineup, Supplier VoltGear (Pune)
+No direct dispatch confirmation on file. Based on average factory queue
+depth and this supplier's recent throughput, estimated arrival at site is
+2026-08-24 (inferred, low confidence). Recommend confirming with supplier.

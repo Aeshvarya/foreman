@@ -10,9 +10,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from cascade import run_cascade          # noqa: E402
-from db import graph_from_neo4j          # noqa: E402
+from db import graph_from_neo4j, load_to_neo4j  # noqa: E402
 from graph import build_graph            # noqa: E402
 from risk import risk_radar              # noqa: E402
+
+# Reload the clean project baseline so this guard tests the Neo4j<->NetworkX
+# mirror in isolation (independent of any KG-builder doc enrichment run since).
+load_to_neo4j()
 
 json_g = build_graph()
 neo_g = graph_from_neo4j()

@@ -158,6 +158,13 @@ def run_cypher(query: str, params: dict | None = None) -> list[dict]:
         return [r.data() for r in s.run(query, params or {})]
 
 
+def update_material(mat_id: str, props: dict) -> None:
+    """Write extracted evidence (confidence, source, conflict flag) onto a
+    Material node. Used by the KG Builder to keep status current from docs."""
+    with _driver() as drv, drv.session() as s:
+        s.run("MATCH (m:Material {id:$id}) SET m += $props", id=mat_id, props=props)
+
+
 def verify(silent: bool = False) -> dict:
     with _driver() as drv, drv.session() as s:
         counts = {
