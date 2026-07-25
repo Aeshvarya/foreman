@@ -18,7 +18,7 @@ function FMNode({ data }: NodeProps) {
   const { label, name, state, clickable, faded } = data as
     { label: string; name: string; state: State; clickable: boolean; faded: boolean };
   const styles: Record<State, string> = {
-    dim: "border-line bg-elev/80 text-muted",
+    dim: "border-line-strong bg-elev/95 text-muted",
     delayed: "border-amber bg-amber/15 text-amber shadow-[0_0_26px_-2px_rgba(245,166,35,0.75)]",
     slipped: "border-red bg-red/15 text-red shadow-[0_0_22px_-2px_rgba(229,72,77,0.7)]",
     "handover-safe": "border-green bg-green/15 text-green shadow-[0_0_24px_-2px_rgba(70,167,88,0.6)]",

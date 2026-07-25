@@ -82,12 +82,14 @@ body::after {
 ::selection { background: rgba(245, 166, 35, 0.28); color: #fff; }
 
 /* React Flow edges — dim structure vs the glowing critical path. */
+/* Default (no material slipped): connections clearly visible. */
 .react-flow__edge.fm-dim .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.06);
-  stroke-width: 1;
+  stroke: rgba(180, 195, 215, 0.28);
+  stroke-width: 1.3;
 }
+/* Only when focusing a cascade do the off-path edges recede. */
 .react-flow__edge.fm-faint .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.02);
+  stroke: rgba(255, 255, 255, 0.04);
   stroke-width: 1;
 }
 .react-flow__edge.fm-hot .react-flow__edge-path {
