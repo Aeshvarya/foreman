@@ -20,7 +20,7 @@ export default function Cascade() {
   // recompute the COMBINED cascade whenever the set of delays changes
   useEffect(() => {
     let live = true;
-    api.cascadeMulti(delays).then((r) => { if (live) setReport(r); });
+    api.cascadeMulti(delays).then((r) => { if (live) setReport(r); }).catch(() => {});
     return () => { live = false; };
   }, [delays]);
 
@@ -46,20 +46,41 @@ export default function Cascade() {
   const setDelay = (id: string, days: number) => setDelays((d) => ({ ...d, [id]: days }));
   const addable = materials.filter((m) => !(m.id in delays));
 
+  // Slip a whole supplier's order — a supplier usually delays every item at once.
+  const suppliers = (project?.nodes ?? []).filter((n) => n.kind === "supplier");
+  const addSupplier = (supId: string) => setDelays((d) => {
+    const n = { ...d };
+    materials.filter((m) => m.supplier === supId).forEach((m) => { if (!(m.id in n)) n[m.id] = 7; });
+    return n;
+  });
+
   return (
     <div className="flex flex-col gap-5">
       {/* controls + verdict */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr]">
         <GlassCard className="p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <Kicker>Materials slipping ({Object.keys(delays).length})</Kicker>
-            {addable.length > 0 && (
-              <select className={cn(input, "!py-1.5 text-xs")} value=""
-                onChange={(e) => e.target.value && toggle(e.target.value)}>
-                <option value="">+ add material</option>
-                {addable.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            )}
+            <div className="flex items-center gap-2">
+              {Object.keys(delays).length > 0 && (
+                <button onClick={() => setDelays({})}
+                  className="text-xs text-faint transition hover:text-red">clear all</button>
+              )}
+              {suppliers.length > 0 && (
+                <select className={cn(input, "!py-1.5 text-xs")} value=""
+                  onChange={(e) => e.target.value && addSupplier(e.target.value)} title="Slip every material from one supplier">
+                  <option value="">+ slip a supplier's order</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              )}
+              {addable.length > 0 && (
+                <select className={cn(input, "!py-1.5 text-xs")} value=""
+                  onChange={(e) => e.target.value && toggle(e.target.value)}>
+                  <option value="">+ add material</option>
+                  {addable.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              )}
+            </div>
           </div>
           {Object.keys(delays).length === 0 ? (
             <div className="text-sm text-muted">No materials selected. Add one, or click a material in the graph.</div>
@@ -104,10 +125,12 @@ export default function Cascade() {
       </div>
 
       {/* THE GRAPH — click materials to toggle them into the delay set */}
-      {project && (
-        <GraphCanvas project={project} delayedIds={delayedIds} slippedIds={slippedIds}
-          handoverBreaks={breaks} onToggleMaterial={toggle} />
-      )}
+      {project
+        ? <GraphCanvas project={project} delayedIds={delayedIds} slippedIds={slippedIds}
+            handoverBreaks={breaks} onToggleMaterial={toggle} />
+        : <div className="flex h-[68vh] min-h-[560px] items-center justify-center rounded-2xl border border-line bg-black/40 text-sm text-muted">
+            <span className="animate-pulse">loading the supply graph…</span>
+          </div>}
 
       {/* details */}
       {report && (

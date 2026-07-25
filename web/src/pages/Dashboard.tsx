@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { useProject } from "../lib/useProject";
 import Cascade from "../tools/Cascade";
 import Radar from "../tools/Radar";
@@ -47,7 +48,9 @@ export default function Dashboard() {
           )}
         </header>
         <div className="px-8 py-7">
-          <Tool />
+          <ErrorBoundary key={tool}>
+            <Tool />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

@@ -26,6 +26,11 @@ export default function Radar() {
 
   return (
     <div className="mx-auto max-w-[980px]">
+      {!mc && risk.length === 0 && (
+        <div className="py-16 text-center text-sm text-muted">
+          <span className="animate-pulse">running the risk model across 3,000 simulations…</span>
+        </div>
+      )}
       {/* Monte-Carlo headline */}
       {mc && (
         <GlassCard className={cn("mb-8 flex items-start gap-4 p-6", breaks ? "border-red/30" : "border-green/25")}>

@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import {
   ReactFlow, Background, BackgroundVariant, Handle, Position, Panel,
-  type Node, type Edge, type NodeProps,
+  type Node, type Edge, type NodeProps, type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Project } from "../lib/api";
@@ -99,8 +99,20 @@ export default function GraphCanvas({
     return { nodes, edges };
   }, [project, delayedIds, slippedIds, handoverBreaks]);
 
+  // Belt-and-suspenders against the "blank until resize" React Flow race:
+  // keep the instance and re-fit whenever the container actually resizes.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const rf = useRef<ReactFlowInstance | null>(null);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => rf.current?.fitView({ padding: 0.12 }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="relative h-[68vh] min-h-[560px] w-full overflow-hidden rounded-2xl border border-line bg-black/40">
+    <div ref={wrapRef} className="relative h-[68vh] min-h-[560px] w-full overflow-hidden rounded-2xl border border-line bg-black/40">
       <div className="pointer-events-none absolute inset-0 z-[1]"
         style={{ background: "radial-gradient(ellipse 60% 55% at 55% 45%, rgba(245,166,35,0.06), transparent 65%)" }} />
       <div className="pointer-events-none absolute inset-0 z-[1]"
@@ -112,7 +124,7 @@ export default function GraphCanvas({
         onNodeClick={(_, node) => { if (materialIds.has(node.id)) onToggleMaterial?.(node.id); }}
         // Re-fit after the container has actually painted — prevents the
         // "blank until resize/refresh" race where RF measures a 0-size box.
-        onInit={(inst) => { setTimeout(() => inst.fitView({ padding: 0.12 }), 60); }}
+        onInit={(inst) => { rf.current = inst; setTimeout(() => inst.fitView({ padding: 0.12 }), 60); }}
         proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.4}>
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,0.05)" />
         <Panel position="top-left" className="!m-4 flex flex-col gap-2">

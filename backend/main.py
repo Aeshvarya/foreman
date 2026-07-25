@@ -129,6 +129,8 @@ def materials():
 @app.post("/api/cascade")
 def cascade(req: CascadeReq):
     g = get_graph()
+    if g.nodes.get(req.material_id, {}).get("kind") != MATERIAL:
+        raise HTTPException(400, f"'{req.material_id}' is not a material")
     return _jsonable(asdict(run_cascade(g, req.material_id, req.delay_days)))
 
 

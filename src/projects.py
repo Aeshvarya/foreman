@@ -147,19 +147,59 @@ def _normalise(data: dict) -> dict:
         "early_start": a.get("early_start", start),
     } for a in data.get("activities", [])]
 
+    # ---- integrity: no dangling references, no dependency cycles ----
+    if not data["project"].get("name", "").strip():
+        raise ValueError("project needs a name")
+    if not suppliers or not materials or not activities:
+        raise ValueError("a project needs at least one supplier, material and activity")
+    sup_ids = {s["id"] for s in suppliers}
+    mat_ids = {m["id"] for m in materials}
+    act_ids = {a["id"] for a in activities}
+    bad = [m["id"] for m in materials if m["supplier"] not in sup_ids]
+    if bad:
+        raise ValueError(f"materials reference unknown suppliers: {bad}")
+    for a in activities:  # drop dangling / self references
+        a["needs_materials"] = [m for m in a["needs_materials"] if m in mat_ids]
+        a["depends_on"] = [d for d in a["depends_on"] if d in act_ids and d != a["id"]]
+    if not _acyclic(activities):
+        raise ValueError("activity dependencies contain a cycle — a schedule cannot loop")
+
     handover = data["project"].get("handover_milestone")
-    if not handover and activities:
+    if handover not in act_ids:
         handover = activities[-1]["id"]
 
     return {
         "project": {
-            "name": data["project"]["name"],
+            "name": data["project"]["name"].strip(),
             "description": data["project"].get("description", "User-created project."),
             "handover_milestone": handover,
             "start_date": start,
         },
         "suppliers": suppliers, "materials": materials, "activities": activities,
     }
+
+
+def _acyclic(activities: list[dict]) -> bool:
+    """Kahn's algorithm — True if the activity dependency graph has no cycle."""
+    from collections import deque
+    ids = {a["id"] for a in activities}
+    deps = {a["id"]: [d for d in a["depends_on"] if d in ids] for a in activities}
+    dependents: dict[str, list[str]] = {i: [] for i in ids}
+    indeg = {i: 0 for i in ids}
+    for i, ds in deps.items():
+        for d in ds:
+            dependents[d].append(i)
+            indeg[i] += 1
+    q = deque(i for i in ids if indeg[i] == 0)
+    seen = 0
+    while q:
+        n = q.popleft()
+        seen += 1
+        for m in dependents[n]:
+            indeg[m] -= 1
+            if indeg[m] == 0:
+                q.append(m)
+    return seen == len(ids)
 
 
 if __name__ == "__main__":
