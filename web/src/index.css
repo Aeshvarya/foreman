@@ -29,7 +29,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Geist Variable", system-ui, sans-serif;
+  font-family: "Hanken Grotesk Variable", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
@@ -60,10 +60,10 @@ body::after {
 
 /* Instrument micro-label — the mono uppercase treatment used everywhere. */
 .kicker {
-  font-family: "Geist Mono Variable", monospace;
-  font-size: 0.68rem;
+  font-family: "JetBrains Mono Variable", monospace;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   color: var(--muted);
 }
 
@@ -83,8 +83,12 @@ body::after {
 
 /* React Flow edges — dim structure vs the glowing critical path. */
 .react-flow__edge.fm-dim .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.09);
-  stroke-width: 1.2;
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 1;
+}
+.react-flow__edge.fm-faint .react-flow__edge-path {
+  stroke: rgba(255, 255, 255, 0.02);
+  stroke-width: 1;
 }
 .react-flow__edge.fm-hot .react-flow__edge-path {
   stroke: var(--amber);

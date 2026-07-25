@@ -15,8 +15,8 @@ const GAP = 74;
    "watch what breaks light up" signature. Material pills are clickable: click
    one to slip it (far easier than a dropdown). */
 function FMNode({ data }: NodeProps) {
-  const { label, name, state, clickable } = data as
-    { label: string; name: string; state: State; clickable: boolean };
+  const { label, name, state, clickable, faded } = data as
+    { label: string; name: string; state: State; clickable: boolean; faded: boolean };
   const styles: Record<State, string> = {
     dim: "border-line bg-elev/80 text-muted",
     delayed: "border-amber bg-amber/15 text-amber shadow-[0_0_26px_-2px_rgba(245,166,35,0.75)]",
@@ -29,13 +29,13 @@ function FMNode({ data }: NodeProps) {
     ? "cursor-pointer hover:border-amber/60 hover:bg-amber/[0.06] hover:shadow-[0_0_18px_-4px_rgba(245,166,35,0.55)]"
     : clickable ? "cursor-pointer" : "";
   return (
-    <div className={`w-[168px] rounded-xl border px-3 py-2 backdrop-blur-sm transition-all duration-300 ${styles[state]} ${clickHint}`}>
+    <div className={`w-[172px] rounded-xl border px-3 py-2 backdrop-blur-sm transition-all duration-300 ${styles[state]} ${clickHint} ${faded ? "opacity-[0.28]" : "opacity-100"}`}>
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-current" : "bg-steel"}`} />
         <span className="font-mono text-[0.72rem] font-semibold">{label}</span>
       </div>
-      <div className="mt-0.5 truncate pl-3.5 text-[0.66rem] leading-tight text-faint">{name}</div>
+      <div className="mt-0.5 truncate pl-3.5 text-[0.68rem] leading-tight text-faint">{name}</div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
     </div>
   );
@@ -60,6 +60,14 @@ export default function GraphCanvas({
     const delayed = delayedIds ?? new Set<string>();
     const tallest = Math.max(...Object.values(heights));
 
+    // Focus mode: when something is delayed, fade everything not on the
+    // active cascade so the eye follows what breaks (declutters the web).
+    const focus = delayed.size > 0;
+    const involved = new Set<string>([...delayed, ...slipped, project.handover]);
+    const near = new Set<string>(involved);
+    for (const e of project.edges)
+      if (involved.has(e.source) || involved.has(e.target)) { near.add(e.source); near.add(e.target); }
+
     const nodes: Node[] = project.nodes.map((n) => {
       const kind = n.kind as keyof typeof COL;
       const i = counters[kind]++;
@@ -71,7 +79,8 @@ export default function GraphCanvas({
       return {
         id: n.id, type: "fm",
         position: { x: COL[kind], y: offset + i * GAP },
-        data: { label: n.id, name: shortName(n.name), state, clickable: kind === "material" },
+        data: { label: n.id, name: shortName(n.name), state, clickable: kind === "material",
+                faded: focus && !near.has(n.id) },
         draggable: false,
       };
     });
@@ -79,10 +88,12 @@ export default function GraphCanvas({
     const hot = new Set<string>([...delayed, ...slipped]);
     const edges: Edge[] = project.edges.map((e, i) => {
       const isHot = hot.has(e.source) && (hot.has(e.target) || e.target === project.handover);
+      let cls = "fm-dim";
+      if (isHot) cls = "fm-hot";
+      else if (focus && !(near.has(e.source) && near.has(e.target))) cls = "fm-faint";
       return {
         id: `e${i}`, source: e.source, target: e.target,
-        type: "default", animated: isHot,
-        className: isHot ? "fm-hot" : "fm-dim",
+        type: "default", animated: isHot, className: cls,
       };
     });
     return { nodes, edges };

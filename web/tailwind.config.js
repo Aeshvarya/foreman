@@ -21,9 +21,9 @@ export default {
         "steel-bright": "var(--steel-bright)",
       },
       fontFamily: {
-        display: ['"Space Grotesk"', "sans-serif"],
-        sans: ['"Geist Variable"', "system-ui", "sans-serif"],
-        mono: ['"Geist Mono Variable"', "ui-monospace", "monospace"],
+        display: ['"Bricolage Grotesque Variable"', "sans-serif"],
+        sans: ['"Hanken Grotesk Variable"', "system-ui", "sans-serif"],
+        mono: ['"JetBrains Mono Variable"', "ui-monospace", "monospace"],
       },
       letterSpacing: { micro: "0.18em" },
       boxShadow: {

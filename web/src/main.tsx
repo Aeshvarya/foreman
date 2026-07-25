@@ -1,11 +1,11 @@
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
-// Self-hosted fonts (no CDN): Geist (UI), Geist Mono (data), Space Grotesk (display).
-import "@fontsource-variable/geist";
-import "@fontsource-variable/geist-mono";
-import "@fontsource/space-grotesk/500.css";
-import "@fontsource/space-grotesk/700.css";
+// Self-hosted fonts (no CDN): Bricolage Grotesque (display, characterful),
+// Hanken Grotesk (UI/body, clean + warm), JetBrains Mono (data).
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource-variable/hanken-grotesk";
+import "@fontsource-variable/jetbrains-mono";
 
 import "./index.css";
 import App from "./App";
