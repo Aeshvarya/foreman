@@ -2,23 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ Mission-Critical Command Center — design tokens ============ */
+/* ============ Premium glassmorphism — design tokens ============ */
 :root {
-  --bg: #08090b;
-  --bg-elev: #0e1014;
-  --surface: rgba(255, 255, 255, 0.03);
-  --surface-2: rgba(255, 255, 255, 0.055);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #edeef0;
-  --muted: #8a8f98;
-  --faint: #565b66;
+  --bg: #0a0b10;
+  --bg-elev: #14161d;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text: #f2f3f5;
+  --muted: #9aa0ab;
+  --faint: #626775;
   --amber: #f5a623;
-  --amber-bright: #ffb93d;
-  --red: #e5484d;
-  --green: #46a758;
-  --steel: #6b7d93;
-  --steel-bright: #8ba3bd;
+  --amber-bright: #ffc355;
+  --red: #f06a6f;
+  --green: #5bc48a;
+  --steel: #7f93ad;
+  --steel-bright: #a9bcd6;
 }
 
 * { box-sizing: border-box; }
@@ -35,17 +35,20 @@ body {
   overflow-x: hidden;
 }
 
-/* Film-grain + ambient glow — the cinematic depth of the command center.
-   Fixed, non-interactive, cheap. This texture is a signature, not decoration. */
+/* Ambient colour field — soft, blurred orbs the frosted glass refracts.
+   Without this, backdrop-blur over flat black does nothing. Muted + calm. */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -10%;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(900px 500px at 15% -10%, rgba(245, 166, 35, 0.06), transparent 60%),
-    radial-gradient(700px 500px at 100% 0%, rgba(107, 125, 147, 0.05), transparent 55%);
+    radial-gradient(48rem 34rem at 8% -8%, rgba(126, 150, 198, 0.24), transparent 60%),
+    radial-gradient(44rem 32rem at 104% 2%, rgba(245, 176, 70, 0.12), transparent 56%),
+    radial-gradient(48rem 44rem at 88% 106%, rgba(132, 112, 196, 0.22), transparent 60%),
+    radial-gradient(42rem 32rem at 12% 104%, rgba(96, 142, 182, 0.15), transparent 60%);
+  filter: saturate(118%);
 }
 body::after {
   content: "";
@@ -68,10 +71,18 @@ body::after {
 }
 
 .hairline { border: 1px solid var(--border); }
+
+/* Frosted glass — the signature surface. Gradient fill + light top edge +
+   real backdrop blur so it refracts the ambient field behind it. */
 .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
-  border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  box-shadow:
+    0 12px 40px -14px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }

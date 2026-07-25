@@ -52,8 +52,8 @@ export function GlassCard({
 }: { children: ReactNode; className?: string; hover?: boolean }) {
   return (
     <div className={cn(
-      "glass rounded-xl shadow-panel",
-      hover && "transition-all duration-200 hover:border-amber/30 hover:-translate-y-0.5",
+      "glass rounded-2xl",
+      hover && "transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-[0_18px_50px_-16px_rgba(0,0,0,0.6)]",
       className,
     )}>{children}</div>
   );
