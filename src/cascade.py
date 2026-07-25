@@ -144,6 +144,69 @@ def run_cascade(g: nx.DiGraph, material_id: str, delay_days: int) -> CascadeRepo
     return report
 
 
+def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int]) -> CascadeReport:
+    """Answer: 'if THESE materials slip by these amounts, what breaks?'
+
+    Real projects rarely have one late item. An activity that needs several
+    materials is held by the LATEST of them, and downstream cascades combine.
+    This overrides every delayed material's arrival at once and diffs the whole
+    schedule against baseline, so the report reflects the *combined* effect.
+    """
+    delays = {m: int(d) for m, d in delays.items()
+              if m in g.nodes and int(d) > 0 and g.nodes[m].get("kind") == MATERIAL}
+    baseline = forward_pass(g)
+    overrides = {m: _d(g.nodes[m]["expected_arrival"]) + timedelta(days=d)
+                 for m, d in delays.items()}
+    scenario = forward_pass(g, overrides)
+    handover_id = g.graph["handover"]
+
+    label = ", ".join(f"{m} +{delays[m]}d" for m in delays) or "no delay"
+    # Weakest-link confidence: we're only as sure as the least-certain delayed item.
+    confidence = min((g.nodes[m]["confidence"] for m in delays), default=1.0)
+    report = CascadeReport(
+        delayed_material=label,
+        delay_days=max(delays.values(), default=0),
+        confidence=confidence,
+        confidence_source=(f"{len(delays)} material(s) delayed together"
+                           if delays else "no delay"),
+        baseline_handover=baseline[handover_id].finish,
+        handover_date=scenario[handover_id].finish,
+    )
+    report.handover_slip_days = (report.handover_date -
+                                 report.baseline_handover).days
+
+    # Union of every delayed material's blast radius.
+    affected: set[str] = set()
+    for m in delays:
+        affected |= {n for n in nx.descendants(g, m)
+                     if g.nodes[n]["kind"] == ACTIVITY}
+    for act_id in affected:
+        slip = scenario[act_id].shifted_vs(baseline[act_id])
+        entry = {
+            "activity": act_id, "name": g.nodes[act_id]["name"],
+            "baseline_finish": baseline[act_id].finish.isoformat(),
+            "new_finish": scenario[act_id].finish.isoformat(),
+            "slip_days": slip,
+        }
+        (report.slipped if slip > 0 else report.absorbed).append(entry)
+    report.slipped.sort(key=lambda e: -e["slip_days"])
+
+    if report.handover_slip_days > 0:
+        report.mitigation = (
+            f"Expedite the delayed materials ({', '.join(delays)}) to protect "
+            f"handover — the combined slip is {report.handover_slip_days} day(s). "
+            f"{len(report.absorbed)} downstream activities have float and absorb "
+            f"the remainder."
+        )
+    elif delays:
+        report.mitigation = (
+            "Schedule float fully absorbs the combined delay. Monitor only."
+        )
+    else:
+        report.mitigation = "No materials selected — pick one or more to slip."
+    return report
+
+
 def format_report(r: CascadeReport) -> str:
     lines = [
         f"⚠ DELAY SCENARIO: {r.delayed_material} slips {r.delay_days} days",

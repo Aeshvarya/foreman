@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import time
 
 from db import get_graph, load_to_neo4j        # noqa: E402
-from cascade import run_cascade                # noqa: E402
+from cascade import run_cascade, run_cascade_multi   # noqa: E402
 from risk import risk_radar                    # noqa: E402
 from montecarlo import simulate                # noqa: E402
 from alt_supplier import recommend             # noqa: E402
@@ -73,6 +73,10 @@ def _jsonable(obj):
 class CascadeReq(BaseModel):
     material_id: str
     delay_days: int = 5
+
+
+class CascadeMultiReq(BaseModel):
+    delays: dict[str, int]   # {material_id: delay_days}
 
 
 class AskReq(BaseModel):
@@ -126,6 +130,13 @@ def materials():
 def cascade(req: CascadeReq):
     g = get_graph()
     return _jsonable(asdict(run_cascade(g, req.material_id, req.delay_days)))
+
+
+@app.post("/api/cascade-multi")
+def cascade_multi(req: CascadeMultiReq):
+    """Combined cascade over several materials delayed at once."""
+    g = get_graph()
+    return _jsonable(asdict(run_cascade_multi(g, req.delays)))
 
 
 @app.get("/api/risk")

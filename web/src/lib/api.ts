@@ -107,6 +107,8 @@ export const api = {
   materials: () => get<Material[]>("/api/materials"),
   cascade: (material_id: string, delay_days: number) =>
     post<CascadeReport>("/api/cascade", { material_id, delay_days }),
+  cascadeMulti: (delays: Record<string, number>) =>
+    post<CascadeReport>("/api/cascade-multi", { delays }),
   risk: () => get<RiskItem[]>("/api/risk"),
   montecarlo: () => get<MonteCarlo>("/api/montecarlo"),
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),

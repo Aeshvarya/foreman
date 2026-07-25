@@ -1,55 +1,89 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ShieldCheck, Wrench, Truck } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
 import { api, type Material, type CascadeReport, type AltSupplier } from "../lib/api";
 import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
 
+const input = "rounded-lg border border-line bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber/50";
+
 export default function Cascade() {
   const { project } = useProject();
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [matId, setMatId] = useState("MAT-1");
-  const [delay, setDelay] = useState(5);
+  const [delays, setDelays] = useState<Record<string, number>>({ "MAT-1": 5 });
   const [report, setReport] = useState<CascadeReport | null>(null);
-  const [alt, setAlt] = useState<AltSupplier | null>(null);
+  const [alts, setAlts] = useState<Record<string, AltSupplier>>({});
 
   useEffect(() => { api.materials().then(setMaterials); }, []);
+
+  // recompute the COMBINED cascade whenever the set of delays changes
   useEffect(() => {
     let live = true;
-    api.cascade(matId, delay).then((r) => { if (live) setReport(r); });
+    api.cascadeMulti(delays).then((r) => { if (live) setReport(r); });
     return () => { live = false; };
-  }, [matId, delay]);
-  useEffect(() => {
-    if (report && report.handover_slip_days > 0) api.altSupplier(matId).then(setAlt);
-    else setAlt(null);
-  }, [report, matId]);
+  }, [delays]);
 
   const breaks = !!report && report.handover_slip_days > 0;
   const slippedIds = new Set(report?.slipped.map((s) => s.activity) ?? []);
-  const feasibleAlts = alt?.alternates.filter((a) => a.meets_roj) ?? [];
+  const delayedIds = new Set(Object.keys(delays));
+  const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id;
+
+  // alternate suppliers for the delayed materials, only when the handover breaks
+  useEffect(() => {
+    if (!breaks) { setAlts({}); return; }
+    let live = true;
+    Promise.all(Object.keys(delays).map((id) => api.altSupplier(id).then((a) => [id, a] as const)))
+      .then((pairs) => { if (live) setAlts(Object.fromEntries(pairs)); });
+    return () => { live = false; };
+  }, [report, breaks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = (id: string) => setDelays((d) => {
+    const n = { ...d };
+    if (id in n) delete n[id]; else n[id] = 7;
+    return n;
+  });
+  const setDelay = (id: string, days: number) => setDelays((d) => ({ ...d, [id]: days }));
+  const addable = materials.filter((m) => !(m.id in delays));
 
   return (
     <div className="flex flex-col gap-5">
-      {/* controls + verdict share a row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.3fr]">
-        <GlassCard className="flex flex-wrap items-end gap-6 p-5">
-          <label className="flex-1 min-w-[200px]">
-            <div className="kicker mb-2">Which material slips?</div>
-            <select value={matId} onChange={(e) => setMatId(e.target.value)}
-              className="w-full rounded-lg border border-line bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber/50">
-              {materials.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.id})</option>)}
-            </select>
-          </label>
-          <label className="flex-1 min-w-[200px]">
-            <div className="kicker mb-2">By how many days? <span className="text-amber">{delay}d</span></div>
-            <input type="range" min={1} max={30} value={delay} onChange={(e) => setDelay(+e.target.value)}
-              className="w-full" style={{ accentColor: "var(--amber)" }} />
-          </label>
+      {/* controls + verdict */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <GlassCard className="p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <Kicker>Materials slipping ({Object.keys(delays).length})</Kicker>
+            {addable.length > 0 && (
+              <select className={cn(input, "!py-1.5 text-xs")} value=""
+                onChange={(e) => e.target.value && toggle(e.target.value)}>
+                <option value="">+ add material</option>
+                {addable.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            )}
+          </div>
+          {Object.keys(delays).length === 0 ? (
+            <div className="text-sm text-muted">No materials selected. Add one, or click a material in the graph.</div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {Object.entries(delays).map(([id, days]) => (
+                <div key={id} className="rounded-lg border border-amber/20 bg-amber/[0.04] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm"><b className="font-mono text-amber">{id}</b> <span className="text-muted">{name(id)}</span></span>
+                    <button onClick={() => toggle(id)} className="text-faint hover:text-red"><X size={15} /></button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min={1} max={30} value={days} onChange={(e) => setDelay(id, +e.target.value)}
+                      className="flex-1" style={{ accentColor: "var(--amber)" }} />
+                    <span className="w-10 text-right font-mono text-sm text-amber">{days}d</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </GlassCard>
 
         {report && (
-          <GlassCard className={cn("flex items-center gap-4 p-5", breaks ? "border-red/40" : "border-green/30")}>
+          <GlassCard className={cn("flex items-center gap-4 self-start p-5", breaks ? "border-red/40" : "border-green/30")}>
             <div className={breaks ? "text-red" : "text-green"}>
               {breaks ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
             </div>
@@ -60,28 +94,28 @@ export default function Cascade() {
                   : <>Handover holds — <span className="text-green">float absorbs it</span></>}
               </div>
               <div className="mt-0.5 text-sm text-muted">
-                {report.baseline_handover} {breaks && <>→ <span className="text-text">{report.handover_date}</span></>}
-                {" · "}confidence <b className="text-text">{Math.round(report.confidence * 100)}%</b>
-                <span className="text-faint"> ({report.confidence_source})</span>
+                combined effect of {Object.keys(delays).length} delayed material(s)
+                {" · "}{report.baseline_handover} {breaks && <>→ <span className="text-text">{report.handover_date}</span></>}
+                {" · "}weakest confidence <b className="text-text">{Math.round(report.confidence * 100)}%</b>
               </div>
             </div>
           </GlassCard>
         )}
       </div>
 
-      {/* THE GRAPH — the star, full width. Click a material node to slip it. */}
+      {/* THE GRAPH — click materials to toggle them into the delay set */}
       {project && (
-        <GraphCanvas project={project} delayedId={matId} slippedIds={slippedIds}
-          handoverBreaks={breaks} onSelectMaterial={setMatId} />
+        <GraphCanvas project={project} delayedIds={delayedIds} slippedIds={slippedIds}
+          handoverBreaks={breaks} onToggleMaterial={toggle} />
       )}
 
-      {/* details row */}
+      {/* details */}
       {report && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <GlassCard className="p-5">
             <Kicker className="mb-3">Activities that slip · {report.slipped.length}</Kicker>
             {report.slipped.length === 0
-              ? <div className="text-sm text-muted">None — schedule float absorbs the delay.</div>
+              ? <div className="text-sm text-muted">None — schedule float absorbs the combined delay.</div>
               : <div className="flex flex-col gap-2">
                   {report.slipped.slice(0, 6).map((s) => (
                     <div key={s.activity} className="flex items-center justify-between text-sm">
@@ -103,19 +137,25 @@ export default function Cascade() {
             <p className="text-sm leading-relaxed text-muted">{report.mitigation}</p>
           </GlassCard>
 
-          <GlassCard className={cn("p-5", breaks && feasibleAlts.length && "border-amber/20")}>
-            <div className="mb-3 flex items-center gap-2"><Truck size={15} className={breaks && feasibleAlts.length ? "text-amber" : "text-faint"} />
-              <span className="kicker">Alternate supply{alt?.days_to_roj != null && breaks ? ` · ${alt.days_to_roj}d to ROJ` : ""}</span></div>
-            {breaks && feasibleAlts.length > 0
-              ? <div className="flex flex-col gap-2">
-                  {feasibleAlts.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between text-sm">
-                      <span className="text-text">{a.name}</span>
-                      <span className="flex items-center gap-2 text-xs text-faint">{a.lead_days}d <Badge tone="green">meets ROJ</Badge></span>
-                    </div>
-                  ))}
-                </div>
-              : <div className="text-sm text-muted">{breaks ? "No fast switch — expedite the current order." : "Not needed — handover is safe."}</div>}
+          <GlassCard className={cn("p-5", breaks && "border-amber/20")}>
+            <div className="mb-3 flex items-center gap-2"><Truck size={15} className={breaks ? "text-amber" : "text-faint"} />
+              <span className="kicker">Alternate supply</span></div>
+            {!breaks
+              ? <div className="text-sm text-muted">Not needed — handover is safe.</div>
+              : (() => {
+                  const rows = Object.entries(alts).flatMap(([id, a]) =>
+                    (a.alternates?.filter((x) => x.meets_roj) ?? []).slice(0, 1).map((x) => ({ id, x })));
+                  return rows.length === 0
+                    ? <div className="text-sm text-muted">No fast switch — expedite the current orders.</div>
+                    : <div className="flex flex-col gap-2">
+                        {rows.map(({ id, x }) => (
+                          <div key={id} className="flex items-center justify-between text-sm">
+                            <span className="text-text">{x.name} <span className="text-faint text-xs">for {id}</span></span>
+                            <Badge tone="green">meets ROJ</Badge>
+                          </div>
+                        ))}
+                      </div>;
+                })()}
           </GlassCard>
         </div>
       )}

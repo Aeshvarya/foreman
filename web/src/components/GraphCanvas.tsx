@@ -44,10 +44,10 @@ const nodeTypes = { fm: FMNode };
 const shortName = (n: string) => n.replace(/\s*\(.*?\)/, "").split(",")[0];
 
 export default function GraphCanvas({
-  project, delayedId, slippedIds, handoverBreaks, onSelectMaterial,
+  project, delayedIds, slippedIds, handoverBreaks, onToggleMaterial,
 }: {
-  project: Project; delayedId?: string; slippedIds?: Set<string>;
-  handoverBreaks?: boolean; onSelectMaterial?: (id: string) => void;
+  project: Project; delayedIds?: Set<string>; slippedIds?: Set<string>;
+  handoverBreaks?: boolean; onToggleMaterial?: (id: string) => void;
 }) {
   const materialIds = useMemo(
     () => new Set(project.nodes.filter((n) => n.kind === "material").map((n) => n.id)),
@@ -57,6 +57,7 @@ export default function GraphCanvas({
     const counters: Record<string, number> = { supplier: 0, material: 0, activity: 0 };
     const heights = { supplier: 6, material: 8, activity: 12 };
     const slipped = slippedIds ?? new Set<string>();
+    const delayed = delayedIds ?? new Set<string>();
     const tallest = Math.max(...Object.values(heights));
 
     const nodes: Node[] = project.nodes.map((n) => {
@@ -64,7 +65,7 @@ export default function GraphCanvas({
       const i = counters[kind]++;
       const offset = ((tallest - heights[kind]) * GAP) / 2;
       let state: State = "dim";
-      if (n.id === delayedId) state = "delayed";
+      if (delayed.has(n.id)) state = "delayed";
       else if (slipped.has(n.id)) state = "slipped";
       else if (n.id === project.handover) state = handoverBreaks ? "handover-break" : "handover-safe";
       return {
@@ -75,7 +76,7 @@ export default function GraphCanvas({
       };
     });
 
-    const hot = new Set<string>([delayedId ?? "", ...slipped]);
+    const hot = new Set<string>([...delayed, ...slipped]);
     const edges: Edge[] = project.edges.map((e, i) => {
       const isHot = hot.has(e.source) && (hot.has(e.target) || e.target === project.handover);
       return {
@@ -85,7 +86,7 @@ export default function GraphCanvas({
       };
     });
     return { nodes, edges };
-  }, [project, delayedId, slippedIds, handoverBreaks]);
+  }, [project, delayedIds, slippedIds, handoverBreaks]);
 
   return (
     <div className="relative h-[68vh] min-h-[560px] w-full overflow-hidden rounded-2xl border border-line bg-black/40">
@@ -97,7 +98,7 @@ export default function GraphCanvas({
         nodes={nodes} edges={edges} nodeTypes={nodeTypes}
         fitView fitViewOptions={{ padding: 0.12 }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
-        onNodeClick={(_, node) => { if (materialIds.has(node.id)) onSelectMaterial?.(node.id); }}
+        onNodeClick={(_, node) => { if (materialIds.has(node.id)) onToggleMaterial?.(node.id); }}
         // Re-fit after the container has actually painted — prevents the
         // "blank until resize/refresh" race where RF measures a 0-size box.
         onInit={(inst) => { setTimeout(() => inst.fitView({ padding: 0.12 }), 60); }}
@@ -109,7 +110,7 @@ export default function GraphCanvas({
               <span key={l} className="kicker rounded-md border border-line bg-elev/70 px-2.5 py-1 backdrop-blur">{l}</span>
             ))}
           </div>
-          <span className="kicker !text-amber/80">↳ click a material to slip it</span>
+          <span className="kicker !text-amber/80">↳ click materials to slip several at once</span>
         </Panel>
         <Panel position="bottom-right" className="!m-4 flex flex-wrap gap-3 rounded-lg border border-line bg-elev/70 px-3 py-2 backdrop-blur">
           {[["delayed", "var(--amber)"], ["on critical path", "var(--red)"], ["handover", "var(--green)"], ["absorbed by float", "var(--steel)"]].map(([l, c]) => (
