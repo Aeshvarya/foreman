@@ -24,7 +24,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex w-[248px] shrink-0 flex-col border-r border-line px-4 py-5">
+    <aside className="sticky top-0 flex h-screen w-[248px] shrink-0 flex-col overflow-y-auto border-r border-line px-4 py-5">
       <div className="px-2"><Wordmark /></div>
 
       <div className="mt-6">
