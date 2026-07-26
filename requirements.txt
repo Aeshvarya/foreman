@@ -15,6 +15,7 @@ langchain-google-genai>=4.0
 # API (web frontend backend)
 fastapi>=0.110
 uvicorn[standard]>=0.27
+python-multipart>=0.0.9   # required for FastAPI file uploads (Build from Docs)
 
 # Legacy Streamlit UI (kept as fallback)
 streamlit>=1.30

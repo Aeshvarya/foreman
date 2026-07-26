@@ -73,6 +73,8 @@ export interface BuildResult {
   trace: TraceStep[];
 }
 
+export interface DocFile { name: string; seed: boolean; size: number; }
+
 export interface ProjectMeta { id: string; name: string; created: string; active: boolean; seed?: boolean; }
 
 // Payload the New Project builder sends (ids pre-assigned by order).
@@ -114,6 +116,15 @@ export const api = {
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),
   ask: (question: string) => post<AskResult>("/api/ask", { question }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
+  docs: () => get<DocFile[]>("/api/docs"),
+  uploadDocs: async (files: File[]) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    const r = await fetch("/api/docs/upload", { method: "POST", body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `upload → ${r.status}`);
+    return r.json() as Promise<{ saved: string[]; docs: DocFile[] }>;
+  },
+  resetDocs: () => post<{ removed: number; docs: DocFile[] }>("/api/docs/reset", {}),
   projects: () => get<ProjectMeta[]>("/api/projects"),
   createProject: (data: NewProjectInput) => post<{ id: string }>("/api/projects", data),
   activateProject: (id: string) => post<{ active: string }>(`/api/projects/${id}/activate`, {}),

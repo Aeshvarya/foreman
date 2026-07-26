@@ -32,6 +32,53 @@ from agents.llm import invoke_text                    # noqa: E402
 
 DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "docs"
 
+# The fixed synthetic corpus shipped with the repo (PO, email, GPS feed, GRN,
+# submittal log, queue estimate — with a deliberate conflict baked in). Docs
+# uploaded live through the UI get an "uploaded_" prefix so they never
+# collide with or overwrite these, and so a "reset" can cleanly drop back to
+# the known demo state without touching git-tracked fixtures.
+SEED_DOCS = {
+    "GRN_cabling.txt", "PO-1002_switchgear.txt", "email_voltgear_2026-07-18.txt",
+    "factory_queue_estimate_2026-07-20.txt", "gps_tracking_crac.txt",
+    "submittal_log.txt",
+}
+
+
+def list_docs() -> list[dict]:
+    """Every doc the next build will ingest, flagged seed vs user-uploaded."""
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    return [
+        {"name": p.name, "seed": p.name in SEED_DOCS, "size": p.stat().st_size}
+        for p in sorted(DOCS_DIR.glob("*.txt"))
+    ]
+
+
+def save_uploaded_doc(filename: str, content: bytes) -> str:
+    """Write an uploaded document into the corpus. Returns the saved filename."""
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^\w.\-]", "_", Path(filename).name) or "doc.txt"
+    if not safe.lower().endswith(".txt"):
+        safe += ".txt"
+    if not safe.startswith("uploaded_"):
+        safe = f"uploaded_{safe}"
+    dest = DOCS_DIR / safe
+    n = 1
+    while dest.exists():
+        dest = DOCS_DIR / f"{safe[:-4]}_{n}.txt"
+        n += 1
+    dest.write_bytes(content)
+    return dest.name
+
+
+def reset_docs() -> int:
+    """Delete every uploaded doc, restoring the fixed demo corpus. Returns count removed."""
+    removed = 0
+    for p in DOCS_DIR.glob("*.txt"):
+        if p.name not in SEED_DOCS:
+            p.unlink()
+            removed += 1
+    return removed
+
 # How much to trust a fact by the kind of source it came from. This ordering
 # is the whole game: hard evidence (a signed GRN, a live GPS ping) outranks a
 # supplier's word, which outranks an inferred estimate.

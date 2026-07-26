@@ -13,7 +13,7 @@ from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -28,7 +28,9 @@ from risk import risk_radar                    # noqa: E402
 from montecarlo import simulate                # noqa: E402
 from alt_supplier import recommend             # noqa: E402
 from agents.brain import answer as brain_answer          # noqa: E402
-from agents.kg_builder import build_graph_from_docs      # noqa: E402
+from agents.kg_builder import (                          # noqa: E402
+    build_graph_from_docs, list_docs, save_uploaded_doc, reset_docs,
+)
 from graph import MATERIAL, SUPPLIER, ACTIVITY           # noqa: E402
 import projects                                          # noqa: E402
 
@@ -164,6 +166,34 @@ def ask(req: AskReq):
 @app.post("/api/build-graph")
 def build_graph():
     return _jsonable(build_graph_from_docs(write=True))
+
+
+@app.get("/api/docs")
+def docs_list():
+    """Every doc the next Build-from-Docs run will ingest (seed + uploaded)."""
+    return list_docs()
+
+
+@app.post("/api/docs/upload")
+async def docs_upload(files: list[UploadFile] = File(...)):
+    """Add live-uploaded documents to the corpus. Plain text (.txt) only —
+    they get read as raw text and passed straight to the extraction LLM."""
+    saved = []
+    for f in files:
+        if not (f.filename or "").lower().endswith(".txt"):
+            raise HTTPException(400, f"{f.filename}: only .txt documents are supported")
+        content = await f.read()
+        if len(content) > 200_000:
+            raise HTTPException(400, f"{f.filename}: too large (max 200KB)")
+        saved.append(save_uploaded_doc(f.filename, content))
+    return {"saved": saved, "docs": list_docs()}
+
+
+@app.post("/api/docs/reset")
+def docs_reset():
+    """Drop all uploaded docs, restoring the fixed demo corpus."""
+    removed = reset_docs()
+    return {"removed": removed, "docs": list_docs()}
 
 
 # ------------------------------------------------------------ projects

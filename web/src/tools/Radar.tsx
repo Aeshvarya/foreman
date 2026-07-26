@@ -3,6 +3,9 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { api, type RiskItem, type MonteCarlo } from "../lib/api";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
+import { useTour } from "../features/tour/TourProvider";
+import { TourTarget } from "../features/tour/TourTarget";
+import { TOURS } from "../features/tour/tours";
 
 function tone(verdict: string): { tone: "red" | "amber" | "green" | "steel"; label: string } {
   const label = verdict.replace(/^[^\w]+/, "").split("—")[0].trim();
@@ -16,11 +19,22 @@ const barColor = (t: string) => ({ red: "var(--red)", amber: "var(--amber)", gre
 export default function Radar() {
   const [risk, setRisk] = useState<RiskItem[]>([]);
   const [mc, setMc] = useState<MonteCarlo | null>(null);
+  const { start, steps: activeTour } = useTour();
 
   useEffect(() => {
     api.risk().then(setRisk).catch(() => {});
     api.montecarlo().then(setMc).catch(() => {});
   }, []);
+
+  // First-ever visit → spotlight tour, once both the Monte-Carlo headline and
+  // the ranking have data, and no other tour is still running — re-fires once
+  // that clears, so a same-tick race with another tour never drops this one.
+  useEffect(() => {
+    if (!mc || risk.length === 0 || activeTour) return;
+    const t = setTimeout(() => start("radar", TOURS.radar), 200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!mc, risk.length > 0, !!activeTour]);
 
   const breaks = mc && mc.p_slip >= 0.25;
 
@@ -33,6 +47,7 @@ export default function Radar() {
       )}
       {/* Monte-Carlo headline */}
       {mc && (
+        <TourTarget name="radar-mc">
         <GlassCard className={cn("mb-8 flex items-start gap-4 p-6", breaks ? "border-red/30" : "border-green/25")}>
           <div className={cn("mt-0.5", breaks ? "text-red" : "text-green")}>
             {breaks ? <ShieldAlert size={26} /> : <ShieldCheck size={26} />}
@@ -47,9 +62,12 @@ export default function Radar() {
             </div>
           </div>
         </GlassCard>
+        </TourTarget>
       )}
 
-      <Kicker className="mb-4">Silent-killer ranking · breaking point × confidence</Kicker>
+      <TourTarget name="radar-ranking">
+        <Kicker className="mb-4">Silent-killer ranking · breaking point × confidence</Kicker>
+      </TourTarget>
       <div className="flex flex-col gap-3">
         {risk.map((r) => {
           const { tone: t, label } = tone(r.verdict);

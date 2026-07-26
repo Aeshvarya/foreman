@@ -5,6 +5,9 @@ import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
+import { useTour } from "../features/tour/TourProvider";
+import { TourTarget } from "../features/tour/TourTarget";
+import { TOURS } from "../features/tour/tours";
 
 const input = "rounded-lg border border-line bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber/50";
 
@@ -14,8 +17,19 @@ export default function Cascade() {
   const [delays, setDelays] = useState<Record<string, number>>({ "MAT-1": 5 });
   const [report, setReport] = useState<CascadeReport | null>(null);
   const [alts, setAlts] = useState<Record<string, AltSupplier>>({});
+  const { start, steps: activeTour } = useTour();
 
   useEffect(() => { api.materials().then(setMaterials); }, []);
+
+  // First-ever visit → spotlight tour, once the first cascade result is in
+  // and no other tour (e.g. the shell tour) is still running — re-fires once
+  // that clears, so a same-tick race with another tour never drops this one.
+  useEffect(() => {
+    if (!report || activeTour) return;
+    const t = setTimeout(() => start("cascade", TOURS.cascade), 200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!report, !!activeTour]);
 
   // recompute the COMBINED cascade whenever the set of delays changes
   useEffect(() => {
@@ -58,6 +72,7 @@ export default function Cascade() {
     <div className="flex flex-col gap-5">
       {/* controls + verdict */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.15fr]">
+        <TourTarget name="cascade-controls">
         <GlassCard className="p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <Kicker>Materials slipping ({Object.keys(delays).length})</Kicker>
@@ -102,8 +117,10 @@ export default function Cascade() {
             </div>
           )}
         </GlassCard>
+        </TourTarget>
 
         {report && (
+          <TourTarget name="cascade-verdict">
           <GlassCard className={cn("flex items-center gap-4 self-start p-5", breaks ? "border-red/40" : "border-green/30")}>
             <div className={breaks ? "text-red" : "text-green"}>
               {breaks ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
@@ -121,20 +138,23 @@ export default function Cascade() {
               </div>
             </div>
           </GlassCard>
+          </TourTarget>
         )}
       </div>
 
       {/* THE GRAPH — click materials to toggle them into the delay set */}
+      <TourTarget name="cascade-graph">
       {project
         ? <GraphCanvas project={project} delayedIds={delayedIds} slippedIds={slippedIds}
             handoverBreaks={breaks} onToggleMaterial={toggle} />
         : <div className="flex h-[68vh] min-h-[560px] items-center justify-center rounded-2xl border border-line bg-black/40 text-sm text-muted">
             <span className="animate-pulse">loading the supply graph…</span>
           </div>}
+      </TourTarget>
 
       {/* details */}
       {report && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TourTarget name="cascade-details" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <GlassCard className="p-5">
             <Kicker className="mb-3">Activities that slip · {report.slipped.length}</Kicker>
             {report.slipped.length === 0
@@ -180,7 +200,7 @@ export default function Cascade() {
                       </div>;
                 })()}
           </GlassCard>
-        </div>
+        </TourTarget>
       )}
     </div>
   );

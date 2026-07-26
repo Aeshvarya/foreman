@@ -1,7 +1,11 @@
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useProject } from "../lib/useProject";
+import { useTour } from "../features/tour/TourProvider";
+import { TourTarget } from "../features/tour/TourTarget";
+import { TOURS } from "../features/tour/tours";
 import Cascade from "../tools/Cascade";
 import Radar from "../tools/Radar";
 import Ask from "../tools/Ask";
@@ -19,8 +23,20 @@ const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
 export default function Dashboard() {
   const { tool = "cascade" } = useParams();
   const { project } = useProject();
+  const { start, steps: activeTour } = useTour();
   const active = TOOLS[tool] ?? TOOLS.cascade;
   const Tool = active.el;
+
+  // First-ever dashboard visit → spotlight tour of the shell (project switcher,
+  // tool list, live KPIs). Waits for the project to load so targets are real,
+  // and for any other tour (e.g. the current tool's own) to finish first —
+  // re-fires once that clears, so a same-tick race never drops this tour.
+  useEffect(() => {
+    if (!project || activeTour) return;
+    const t = setTimeout(() => start("dashboard-shell", TOURS["dashboard-shell"]), 200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!project, !!activeTour]);
 
   return (
     <div className="flex min-h-screen">
@@ -32,7 +48,7 @@ export default function Dashboard() {
             <p className="mt-0.5 text-sm text-muted">{active.sub}</p>
           </div>
           {project && (
-            <div className="hidden items-center gap-6 md:flex">
+            <TourTarget name="shell-kpis" className="hidden items-center gap-6 md:flex">
               {[
                 [project.counts.suppliers, "suppliers"],
                 [project.counts.materials, "materials"],
@@ -44,7 +60,7 @@ export default function Dashboard() {
                   <div className="kicker mt-1">{l}</div>
                 </div>
               ))}
-            </div>
+            </TourTarget>
           )}
         </header>
         <div className="px-8 py-7">

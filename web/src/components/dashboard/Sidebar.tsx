@@ -1,8 +1,11 @@
-import { NavLink } from "react-router-dom";
-import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft } from "lucide-react";
+import { NavLink, useParams } from "react-router-dom";
+import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp } from "lucide-react";
 import { Wordmark } from "../primitives";
 import ProjectSwitcher from "./ProjectSwitcher";
 import { cn } from "../../lib/cn";
+import { useTour } from "../../features/tour/TourProvider";
+import { TourTarget } from "../../features/tour/TourTarget";
+import { TOOL_TOUR_ID, TOURS } from "../../features/tour/tours";
 
 const TOOLS = [
   { slug: "cascade", label: "Cascade Simulator", icon: Zap },
@@ -12,16 +15,24 @@ const TOOLS = [
 ];
 
 export default function Sidebar() {
+  const { tool = "cascade" } = useParams();
+  const { restart } = useTour();
+
+  function replayTutorial() {
+    const id = TOOL_TOUR_ID[tool] ?? "cascade";
+    restart(id, TOURS[id]);
+  }
+
   return (
     <aside className="flex w-[248px] shrink-0 flex-col border-r border-line px-4 py-5">
       <div className="px-2"><Wordmark /></div>
 
       <div className="mt-6">
         <div className="kicker mb-2 px-2">Project</div>
-        <ProjectSwitcher />
+        <TourTarget name="shell-project"><ProjectSwitcher /></TourTarget>
       </div>
 
-      <nav className="mt-7 flex flex-col gap-1">
+      <TourTarget name="shell-tools" as="nav" className="mt-7 flex flex-col gap-1">
         <div className="kicker px-2 pb-2">Tools</div>
         {TOOLS.map((t) => (
           <NavLink key={t.slug} to={`/dashboard/${t.slug}`}
@@ -35,9 +46,13 @@ export default function Sidebar() {
             {t.label}
           </NavLink>
         ))}
-      </nav>
+      </TourTarget>
 
-      <div className="mt-auto px-1">
+      <div className="mt-auto flex flex-col gap-2 px-1">
+        <button onClick={replayTutorial}
+          className="flex items-center gap-2 px-2 text-sm text-faint transition hover:text-amber">
+          <CircleHelp size={14} /> Replay tutorial
+        </button>
         <NavLink to="/" className="flex items-center gap-2 px-2 text-sm text-faint hover:text-muted">
           <ArrowLeft size={14} /> Back to site
         </NavLink>
