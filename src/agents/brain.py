@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agents.cascade_agent import explain_cascade   # noqa: E402
+from agents.cascade_agent import explain_cascade, narrate_scene   # noqa: E402
 from agents.query_agent import ask                  # noqa: E402
 
 # Signals that the user is describing a delay scenario to simulate.
@@ -26,8 +26,19 @@ _WHATIF = re.compile(
     r"slips? \d+|delayed? by|push(ed)? back|misses? its? roj)\b", re.I)
 
 
-def answer(question: str) -> dict:
-    """Route and answer. Returns {answer, citations, trace, mode}."""
+def answer(question: str, scene: dict | None = None) -> dict:
+    """Route and answer. Returns {answer, citations, trace, mode}.
+
+    If `scene` is given (the frontend's live on-screen Cascade Simulator
+    state), it always wins — bypassing the what-if regex entirely, since a
+    scene full of "delayed"/"slip" words would otherwise get misrouted into
+    re-parsing a brand new delay scenario instead of explaining the one
+    already computed and sitting on screen.
+    """
+    if scene is not None:
+        res = narrate_scene(question, scene)
+        res["mode"] = "scene"
+        return res
     if _WHATIF.search(question):
         res = explain_cascade(question)
         res["mode"] = "cascade"

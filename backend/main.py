@@ -83,6 +83,7 @@ class CascadeMultiReq(BaseModel):
 
 class AskReq(BaseModel):
     question: str
+    scene: dict | None = None   # live on-screen Cascade Simulator state, if any
 
 
 # ------------------------------------------------------------------ routes
@@ -160,7 +161,7 @@ def alt_supplier(material_id: str):
 
 @app.post("/api/ask")
 def ask(req: AskReq):
-    return _jsonable(brain_answer(req.question))
+    return _jsonable(brain_answer(req.question, req.scene))
 
 
 @app.post("/api/build-graph")

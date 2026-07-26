@@ -56,7 +56,22 @@ export interface AltSupplier {
 
 export interface TraceStep { step: string; detail: string; }
 export interface AskResult {
-  answer: string; citations: string[]; trace: TraceStep[]; mode: "query" | "cascade";
+  answer: string; citations: string[]; trace: TraceStep[]; mode: "query" | "cascade" | "scene";
+}
+
+/** Snapshot of the live Cascade Simulator state, sent to /api/ask so the
+ * assistant can explain what's currently on screen instead of re-querying
+ * the static graph. Written by the Cascade tool, read by any Ask surface. */
+export interface CascadeScene {
+  delayed: { id: string; name: string; days: number }[];
+  handover_breaks: boolean;
+  handover_slip_days: number;
+  baseline_handover: string;
+  new_handover: string;
+  confidence: number;
+  slipped_activities: { id: string; name: string; slip_days: number }[];
+  absorbed_by_float: string[];
+  mitigation: string;
 }
 
 export interface BuildResult {
@@ -114,7 +129,8 @@ export const api = {
   risk: () => get<RiskItem[]>("/api/risk"),
   montecarlo: () => get<MonteCarlo>("/api/montecarlo"),
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),
-  ask: (question: string) => post<AskResult>("/api/ask", { question }),
+  ask: (question: string, scene?: CascadeScene) =>
+    post<AskResult>("/api/ask", scene ? { question, scene } : { question }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
   docs: () => get<DocFile[]>("/api/docs"),
   uploadDocs: async (files: File[]) => {

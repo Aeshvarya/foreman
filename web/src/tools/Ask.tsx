@@ -6,6 +6,7 @@ import { cn } from "../lib/cn";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
+import { readScene } from "../lib/scene";
 
 const EXAMPLES = [
   "Which materials have confidence below 0.75?",
@@ -61,7 +62,7 @@ export default function Ask() {
     const idx = turns.length;
     setTurns((t) => [...t, { q, loading: true }]);
     try {
-      const res = await api.ask(q);
+      const res = await api.ask(q, readScene());
       setTurns((t) => t.map((x, i) => (i === idx ? { q, res } : x)));
     } catch {
       setTurns((t) => t.map((x, i) => (i === idx ? { q, res: { answer: "The agent is unavailable — is the API running with a Gemini key?", citations: [], trace: [], mode: "query" } } : x)));

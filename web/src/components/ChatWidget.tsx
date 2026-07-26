@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, X, Send, Brain } from "lucide-react";
+import { Sparkles, X, Send, Brain, Eye } from "lucide-react";
 import { api, type AskResult } from "../lib/api";
+import { readScene } from "../lib/scene";
 import { cn } from "../lib/cn";
 
 const EXAMPLES = [
@@ -17,11 +18,24 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [sceneActive, setSceneActive] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, open]);
+
+  // Re-check whenever the panel opens (and while it's open, on an interval —
+  // sessionStorage writes from the Cascade tool don't trigger a re-render
+  // here on their own) so the "reading your live simulator" hint stays true
+  // to whatever's actually on screen right now.
+  useEffect(() => {
+    if (!open) return;
+    const check = () => setSceneActive(!!readScene());
+    check();
+    const id = setInterval(check, 1000);
+    return () => clearInterval(id);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +49,7 @@ export default function ChatWidget() {
     setInput("");
     setMsgs((m) => [...m, { role: "user", text: q }, { role: "bot", text: "", loading: true }]);
     try {
-      const res = await api.ask(q);
+      const res = await api.ask(q, readScene());
       setMsgs((m) => m.map((x, i) => (i === m.length - 1 ? { role: "bot", text: res.answer, res } : x)));
     } catch {
       setMsgs((m) => m.map((x, i) => (i === m.length - 1
@@ -68,6 +82,12 @@ export default function ChatWidget() {
                 <X size={18} />
               </button>
             </div>
+
+            {sceneActive && (
+              <div className="flex items-center gap-1.5 border-b border-amber/15 bg-amber/[0.06] px-4 py-1.5 text-[0.68rem] text-amber/90">
+                <Eye size={11} /> reading your live Cascade Simulator selection
+              </div>
+            )}
 
             {/* messages */}
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
-import { api, type Material, type CascadeReport, type AltSupplier } from "../lib/api";
+import { api, type Material, type CascadeReport, type AltSupplier, type CascadeScene } from "../lib/api";
 import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
@@ -8,6 +8,7 @@ import { cn } from "../lib/cn";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
+import { SCENE_KEY } from "../lib/scene";
 
 const input = "rounded-lg border border-line bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber/50";
 
@@ -67,6 +68,29 @@ export default function Cascade() {
       .then((pairs) => { if (live) setAlts(Object.fromEntries(pairs)); });
     return () => { live = false; };
   }, [report, breaks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Publish the live simulator state so any "Ask Foreman" surface (the
+  // floating widget or the dedicated tab) can explain what's actually on
+  // screen right now instead of re-querying the static graph. Cleared on
+  // unmount so it can never be stale-referenced from a different page.
+  useEffect(() => {
+    if (!report) return;
+    const scene: CascadeScene = {
+      delayed: Object.entries(debouncedDelays).map(([id, days]) => ({ id, name: name(id), days })),
+      handover_breaks: breaks,
+      handover_slip_days: report.handover_slip_days,
+      baseline_handover: report.baseline_handover,
+      new_handover: report.handover_date,
+      confidence: report.confidence,
+      slipped_activities: report.slipped.map((s) => ({ id: s.activity, name: s.name, slip_days: s.slip_days })),
+      absorbed_by_float: report.absorbed.map((s) => s.activity),
+      mitigation: report.mitigation,
+    };
+    try { sessionStorage.setItem(SCENE_KEY, JSON.stringify(scene)); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, debouncedDelays, breaks]);
+
+  useEffect(() => () => { try { sessionStorage.removeItem(SCENE_KEY); } catch { /* ignore */ } }, []);
 
   const toggle = (id: string) => setDelays((d) => {
     const n = { ...d };
