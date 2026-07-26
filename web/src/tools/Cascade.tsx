@@ -15,11 +15,25 @@ export default function Cascade() {
   const { project } = useProject();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [delays, setDelays] = useState<Record<string, number>>({ "MAT-1": 5 });
+  const [debouncedDelays, setDebouncedDelays] = useState(delays);
   const [report, setReport] = useState<CascadeReport | null>(null);
   const [alts, setAlts] = useState<Record<string, AltSupplier>>({});
   const { start, steps: activeTour } = useTour();
 
   useEffect(() => { api.materials().then(setMaterials); }, []);
+
+  // Dragging a slider fires an onChange on every pixel of mouse movement —
+  // tens of updates per second. Feeding that straight into the graph was
+  // slamming React Flow with brand-new nodes/edges arrays faster than its
+  // internal store could settle, and it would silently start dropping edges
+  // (nodes stayed, edges vanished — a real React Flow desync, not a crash).
+  // The slider itself still reads/writes the raw `delays` state so it feels
+  // instant; only the expensive downstream work (network fetch + graph)
+  // waits for a short pause in dragging.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedDelays(delays), 150);
+    return () => clearTimeout(t);
+  }, [delays]);
 
   // First-ever visit → spotlight tour, once the first cascade result is in
   // and no other tour (e.g. the shell tour) is still running — re-fires once
@@ -31,23 +45,25 @@ export default function Cascade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!report, !!activeTour]);
 
-  // recompute the COMBINED cascade whenever the set of delays changes
+  // recompute the COMBINED cascade whenever the (debounced) set of delays changes
   useEffect(() => {
     let live = true;
-    api.cascadeMulti(delays).then((r) => { if (live) setReport(r); }).catch(() => {});
+    api.cascadeMulti(debouncedDelays).then((r) => { if (live) setReport(r); }).catch(() => {});
     return () => { live = false; };
-  }, [delays]);
+  }, [debouncedDelays]);
 
   const breaks = !!report && report.handover_slip_days > 0;
   const slippedIds = new Set(report?.slipped.map((s) => s.activity) ?? []);
-  const delayedIds = new Set(Object.keys(delays));
+  // The graph reads the debounced set too, so "delayed" (amber) and "slipped"
+  // (red) always reflect the SAME point in time — never a half-updated frame.
+  const delayedIds = new Set(Object.keys(debouncedDelays));
   const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id;
 
   // alternate suppliers for the delayed materials, only when the handover breaks
   useEffect(() => {
     if (!breaks) { setAlts({}); return; }
     let live = true;
-    Promise.all(Object.keys(delays).map((id) => api.altSupplier(id).then((a) => [id, a] as const)))
+    Promise.all(Object.keys(debouncedDelays).map((id) => api.altSupplier(id).then((a) => [id, a] as const)))
       .then((pairs) => { if (live) setAlts(Object.fromEntries(pairs)); });
     return () => { live = false; };
   }, [report, breaks]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -132,7 +148,7 @@ export default function Cascade() {
                   : <>Handover holds — <span className="text-green">float absorbs it</span></>}
               </div>
               <div className="mt-0.5 text-sm text-muted">
-                combined effect of {Object.keys(delays).length} delayed material(s)
+                combined effect of {Object.keys(debouncedDelays).length} delayed material(s)
                 {" · "}{report.baseline_handover} {breaks && <>→ <span className="text-text">{report.handover_date}</span></>}
                 {" · "}weakest confidence <b className="text-text">{Math.round(report.confidence * 100)}%</b>
               </div>
