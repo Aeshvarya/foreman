@@ -8,5 +8,8 @@ __pycache__/
 # user projects (runtime, seeded from data/project.json)
 data/projects/
 
+# LLM response cache (runtime, machine-local; warms the demo across restarts)
+data/.llm_cache.json
+
 # private LaTeX study notebook (not for public repo)
 study/

@@ -26,6 +26,24 @@ def _d(iso: str) -> date:
     return date.fromisoformat(iso)
 
 
+def _natural(activity_id: str) -> tuple:
+    """Sort key giving ACT-2 before ACT-10 (not lexicographic)."""
+    head, _, num = activity_id.rpartition("-")
+    return (head, int(num)) if num.isdigit() else (activity_id, 0)
+
+
+def _order(entries: list[dict]) -> list[dict]:
+    """Deterministic report ordering: biggest slip first, then natural id.
+
+    The activity set comes from `nx.descendants()`, which returns a *set* —
+    so without an explicit tiebreaker, activities sharing the same slip_days
+    come out in arbitrary (per-process) order. That made the Neo4j-vs-JSON
+    mirror test flap and let the UI's "activities that slip" list reshuffle
+    between renders. Sorting on (slip, natural id) pins both.
+    """
+    return sorted(entries, key=lambda e: (-e["slip_days"], _natural(e["activity"])))
+
+
 @dataclass
 class ActivitySchedule:
     activity_id: str
@@ -124,7 +142,8 @@ def run_cascade(g: nx.DiGraph, material_id: str, delay_days: int) -> CascadeRepo
         }
         (report.slipped if slip > 0 else report.absorbed).append(entry)
 
-    report.slipped.sort(key=lambda e: -e["slip_days"])
+    report.slipped = _order(report.slipped)
+    report.absorbed = _order(report.absorbed)
 
     # Mitigation heuristic: expediting the material by the handover slip
     # amount protects the milestone; also surface schedule float found.
@@ -189,7 +208,8 @@ def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int]) -> CascadeReport:
             "slip_days": slip,
         }
         (report.slipped if slip > 0 else report.absorbed).append(entry)
-    report.slipped.sort(key=lambda e: -e["slip_days"])
+    report.slipped = _order(report.slipped)
+    report.absorbed = _order(report.absorbed)
 
     if report.handover_slip_days > 0:
         report.mitigation = (

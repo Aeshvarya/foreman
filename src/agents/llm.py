@@ -15,7 +15,9 @@ Get a free key: https://aistudio.google.com/apikey  -> put in .env as GEMINI_API
 
 from __future__ import annotations
 
+import hashlib
 import os
+import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,6 +28,83 @@ DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 
 _RATE_LIMITER = None
 _CACHE: dict = {}
+
+# ---------------------------------------------------------------- response cache
+# Free-tier latency is fine on average (~3-7s) but has a long tail: the SAME
+# prompt was measured at 1.0s, 6.8s and 36.5s. That tail is a live-demo hazard,
+# so identical prompts are served from memory on repeat.
+#
+# This is a cache, not a fake: a miss always calls the real model, and every
+# deterministic call (fact extraction, query planning) runs at temperature 0,
+# where repeating a prompt is *defined* to give the same answer. Narration runs
+# at 0.3, so caching there trades a little wording variety for a predictable
+# demo — the underlying numbers come from the CPM engine either way.
+#
+# It also can't go stale behind your back: every prompt embeds the data it
+# reasons over (the queried rows, the document text, the live scene JSON), so
+# any change to the project changes the prompt, changes the key, and misses.
+#
+# Persisted to disk so a rehearsal warms the real demo — an API restart between
+# practising and presenting would otherwise throw the warm cache away.
+_RESPONSES: dict[str, str] = {}
+_RESPONSES_LOCK = threading.Lock()
+MAX_CACHED = 512
+
+CACHE_FILE = Path(__file__).resolve().parents[2] / "data" / ".llm_cache.json"
+CACHE_DISABLED = os.getenv("FOREMAN_NO_LLM_CACHE", "").lower() in {"1", "true", "yes"}
+
+
+def _cache_key(model: str, temperature: float, prompt: str) -> str:
+    return hashlib.sha256(
+        f"{model}|{temperature}|{prompt}".encode()
+    ).hexdigest()
+
+
+def _load_disk_cache() -> None:
+    global _RESPONSES
+    if CACHE_DISABLED or not CACHE_FILE.exists():
+        return
+    try:
+        import json
+        data = json.loads(CACHE_FILE.read_text())
+        if isinstance(data, dict):
+            with _RESPONSES_LOCK:
+                _RESPONSES.update({k: v for k, v in data.items() if isinstance(v, str)})
+    except Exception:
+        pass   # a corrupt cache must never break the app — just start empty
+
+
+def _save_disk_cache() -> None:
+    if CACHE_DISABLED:
+        return
+    try:
+        import json
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with _RESPONSES_LOCK:
+            snapshot = dict(_RESPONSES)
+        tmp = CACHE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(snapshot))
+        tmp.replace(CACHE_FILE)     # atomic — never leave a half-written cache
+    except Exception:
+        pass
+
+
+def cache_stats() -> dict:
+    with _RESPONSES_LOCK:
+        return {"cached_responses": len(_RESPONSES), "limit": MAX_CACHED,
+                "disk": str(CACHE_FILE), "disabled": CACHE_DISABLED}
+
+
+def clear_cache() -> None:
+    with _RESPONSES_LOCK:
+        _RESPONSES.clear()
+    try:
+        CACHE_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+_load_disk_cache()
 
 
 def has_key() -> bool:
@@ -62,9 +141,31 @@ def get_llm(temperature: float = 0.0, model: str | None = None):
     return _CACHE[ck]
 
 
-def invoke_text(prompt: str, temperature: float = 0.0, model: str | None = None) -> str:
-    """Invoke the model and return plain text, robust to str- or list-content."""
-    return _text(get_llm(temperature, model).invoke(prompt))
+def invoke_text(prompt: str, temperature: float = 0.0, model: str | None = None,
+                use_cache: bool = True) -> str:
+    """Invoke the model and return plain text, robust to str- or list-content.
+
+    Identical prompts are served from the in-memory response cache (see above)
+    so a repeated question can't hit the free tier's long latency tail mid-demo.
+    Pass `use_cache=False` to force a fresh call.
+    """
+    mdl = model or DEFAULT_MODEL
+    key = _cache_key(mdl, temperature, prompt)
+    if use_cache:
+        with _RESPONSES_LOCK:
+            hit = _RESPONSES.get(key)
+        if hit is not None:
+            return hit
+
+    out = _text(get_llm(temperature, model).invoke(prompt))
+
+    if use_cache and out:
+        with _RESPONSES_LOCK:
+            if len(_RESPONSES) >= MAX_CACHED:
+                _RESPONSES.pop(next(iter(_RESPONSES)))   # simple FIFO eviction
+            _RESPONSES[key] = out
+        _save_disk_cache()
+    return out
 
 
 # Back-compat alias used around the codebase.

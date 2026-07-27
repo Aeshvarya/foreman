@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, X, Send, Brain, Eye } from "lucide-react";
+import { Sparkles, X, Send, Eye } from "lucide-react";
 import { api, type AskResult } from "../lib/api";
 import { readScene } from "../lib/scene";
 import { cn } from "../lib/cn";
+import Thinking from "./Thinking";
 
 const EXAMPLES = [
   "Which materials are most at risk?",
@@ -111,7 +112,7 @@ export default function ChatWidget() {
               ) : (
                 <div key={i} className="mr-2 rounded-2xl rounded-bl-sm border border-line bg-black/30 px-3 py-2.5 text-sm leading-relaxed">
                   {m.loading ? (
-                    <span className="flex items-center gap-2 text-muted"><Brain size={14} className="animate-pulse text-amber" /> reasoning…</span>
+                    <Thinking compact />
                   ) : (
                     <>
                       <div className="whitespace-pre-wrap">{m.text}</div>

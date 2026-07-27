@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import {
   ReactFlow, Background, BackgroundVariant, Handle, Position, Panel,
   type Node, type Edge, type NodeProps, type ReactFlowInstance,
@@ -53,6 +53,10 @@ export default function GraphCanvas({
     () => new Set(project.nodes.filter((n) => n.kind === "material").map((n) => n.id)),
     [project]);
 
+  // Stable content keys for the two highlight Sets (see the memo below).
+  const delayedKey = [...(delayedIds ?? [])].sort().join(",");
+  const slippedKey = [...(slippedIds ?? [])].sort().join(",");
+
   const { nodes, edges } = useMemo(() => {
     const counters: Record<string, number> = { supplier: 0, material: 0, activity: 0 };
     const heights = { supplier: 6, material: 8, activity: 12 };
@@ -97,12 +101,29 @@ export default function GraphCanvas({
       };
     });
     return { nodes, edges };
-  }, [project, delayedIds, slippedIds, handoverBreaks]);
+    // Keyed on the Sets' CONTENTS, not their object identity: a caller that
+    // rebuilds `new Set(...)` inline every render would otherwise invalidate
+    // this memo forever, and React Flow silently drops its edges when fed new
+    // nodes/edges array identities at that rate. Content keys make the rebuild
+    // happen only when something really changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, delayedKey, slippedKey, handoverBreaks]);
 
   // Belt-and-suspenders against the "blank until resize" React Flow race:
   // keep the instance and re-fit whenever the container actually resizes.
   const wrapRef = useRef<HTMLDivElement>(null);
   const rf = useRef<ReactFlowInstance | null>(null);
+
+  // THE BLANK-GRAPH FIX. React Flow resolves each edge against its source and
+  // target in its internal node store, and if an edge arrives before those
+  // nodes are registered it is dropped — permanently, with no retry and no
+  // error. Handing it nodes and edges in the same first commit hit that race
+  // on roughly 1 in 3 loads: 26 nodes rendered, the edges <svg> present but
+  // empty, and the graph read as "gone blank".
+  //
+  // So mount with nodes only, then hand over the edges on the next frame, once
+  // the nodes are definitely registered.
+  const [edgesReady, setEdgesReady] = useState(false);
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -118,13 +139,18 @@ export default function GraphCanvas({
       <div className="pointer-events-none absolute inset-0 z-[1]"
         style={{ boxShadow: "inset 0 0 160px 40px rgba(0,0,0,0.75)" }} />
       <ReactFlow
-        nodes={nodes} edges={edges} nodeTypes={nodeTypes}
+        nodes={nodes} edges={edgesReady ? edges : []} nodeTypes={nodeTypes}
         fitView fitViewOptions={{ padding: 0.12 }}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
         onNodeClick={(_, node) => { if (materialIds.has(node.id)) onToggleMaterial?.(node.id); }}
-        // Re-fit after the container has actually painted — prevents the
-        // "blank until resize/refresh" race where RF measures a 0-size box.
-        onInit={(inst) => { rf.current = inst; setTimeout(() => inst.fitView({ padding: 0.12 }), 60); }}
+        // Nodes are registered by the time onInit fires — release the edges on
+        // the next frame (see the edgesReady comment above), and re-fit once
+        // the container has actually painted.
+        onInit={(inst) => {
+          rf.current = inst;
+          requestAnimationFrame(() => setEdgesReady(true));
+          setTimeout(() => inst.fitView({ padding: 0.12 }), 60);
+        }}
         proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.4}>
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,0.05)" />
         <Panel position="top-left" className="!m-4 flex flex-col gap-2">

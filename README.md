@@ -51,8 +51,11 @@ Binary-searches the cascade engine for each material's **breaking point** (minim
 ## Architecture
 
 ```
-                    Streamlit UI (app.py) — cascade · radar · Ask Foreman · Build-from-Docs
-                                     │
+   React + TypeScript dashboard (web/)  :5173
+   cascade · radar · Ask Foreman · Build-from-Docs · New Project
+                        │  fetch /api/*
+   FastAPI (backend/main.py)            :8000
+                        │
    KG Builder ───────► Query agent ───────► Cascade agent   (LangGraph + Gemini)
    (docs→facts,        (NL→Cypher,          (CPM + Monte-Carlo
     confidence,         self-correct,        + NL narration)

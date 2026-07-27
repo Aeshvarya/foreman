@@ -27,13 +27,24 @@ assert json_g.graph["handover"] == neo_g.graph["handover"], "handover mismatch"
 
 # Cascade parity across every material + a couple of delay sizes.
 mats = [n for n, d in json_g.nodes(data=True) if d["kind"] == "material"]
+def _slip_map(report):
+    """activity -> slip_days. Compared as a mapping so the check is about the
+    SCHEDULE MATH, not incidental list order."""
+    return {x["activity"]: x["slip_days"] for x in report.slipped}
+
+
 for m in mats:
     for days in (3, 7, 15):
         a = run_cascade(json_g, m, days)
         b = run_cascade(neo_g, m, days)
         assert a.handover_slip_days == b.handover_slip_days, f"{m}+{days} handover"
+        assert _slip_map(a) == _slip_map(b), f"{m}+{days} per-activity slip"
+        assert a.handover_date == b.handover_date, f"{m}+{days} handover date"
+        # Order must ALSO be identical — the engine sorts deterministically
+        # (slip desc, then natural id), so a mismatch here means that guarantee
+        # regressed and the UI list could start reshuffling between renders.
         assert [x["activity"] for x in a.slipped] == [x["activity"] for x in b.slipped], \
-            f"{m}+{days} slipped set"
+            f"{m}+{days} slipped ORDER (deterministic-sort regression)"
 print(f"cascade parity: OK across {len(mats)} materials x 3 delays")
 
 # Risk radar parity.

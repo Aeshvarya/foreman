@@ -7,6 +7,7 @@ import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
 import { readScene } from "../lib/scene";
+import Thinking from "../components/Thinking";
 
 const EXAMPLES = [
   "Which materials have confidence below 0.75?",
@@ -93,9 +94,7 @@ export default function Ask() {
             </div>
             <GlassCard className="p-5">
               {t.loading ? (
-                <div className="flex items-center gap-2 text-sm text-muted">
-                  <Brain size={16} className="animate-pulse text-amber" /> reasoning over the graph…
-                </div>
+                <Thinking />
               ) : t.res && (
                 <>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">{t.res.answer}</div>

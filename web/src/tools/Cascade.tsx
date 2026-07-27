@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
 import { api, type Material, type CascadeReport, type AltSupplier, type CascadeScene } from "../lib/api";
 import { useProject } from "../lib/useProject";
@@ -54,10 +54,23 @@ export default function Cascade() {
   }, [debouncedDelays]);
 
   const breaks = !!report && report.handover_slip_days > 0;
-  const slippedIds = new Set(report?.slipped.map((s) => s.activity) ?? []);
+
+  // These two Sets are GraphCanvas's memo dependencies, so their *identity*
+  // decides whether the graph rebuilds. Built inline with `new Set(...)` they
+  // were fresh objects on every single render, which invalidated that memo
+  // every time and handed React Flow brand-new nodes/edges arrays forever —
+  // and under that churn it intermittently dropped every edge (nodes rendered,
+  // 0 edges, no error). Keying the memo on a stable string makes the identity
+  // change only when the contents actually change.
+  const slippedKey = (report?.slipped ?? []).map((s) => s.activity).sort().join(",");
+  const delayedKey = Object.keys(debouncedDelays).sort().join(",");
   // The graph reads the debounced set too, so "delayed" (amber) and "slipped"
   // (red) always reflect the SAME point in time — never a half-updated frame.
-  const delayedIds = new Set(Object.keys(debouncedDelays));
+  const slippedIds = useMemo(
+    () => new Set(slippedKey ? slippedKey.split(",") : []), [slippedKey]);
+  const delayedIds = useMemo(
+    () => new Set(delayedKey ? delayedKey.split(",") : []), [delayedKey]);
+
   const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id;
 
   // alternate suppliers for the delayed materials, only when the handover breaks

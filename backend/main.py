@@ -9,6 +9,7 @@ Run:  uvicorn backend.main:app --reload --port 8000
 from __future__ import annotations
 
 import sys
+import threading
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
@@ -55,9 +56,24 @@ def _load_active_into_neo4j(retries: int = 8) -> None:
             time.sleep(2)
 
 
+def _warm_llm() -> None:
+    """Fire one tiny call so the first REAL question doesn't also pay for
+    client construction + TLS handshake + cold-path latency. Best-effort: a
+    missing key or offline network must never stop the API from booting (the
+    CPM engine, risk radar and Monte-Carlo don't need an LLM at all)."""
+    try:
+        from agents.llm import has_key, invoke_text
+        if has_key():
+            invoke_text("Reply with exactly: READY", 0)
+            print("[startup] LLM warm")
+    except Exception as e:
+        print(f"[startup] LLM warmup skipped: {str(e)[:120]}")
+
+
 @app.on_event("startup")
 def _startup():
     _load_active_into_neo4j()
+    threading.Thread(target=_warm_llm, daemon=True).start()
 
 
 def _jsonable(obj):
