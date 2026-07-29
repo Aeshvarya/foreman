@@ -6,6 +6,7 @@ import { useProject } from "../lib/useProject";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
+import Today from "../tools/Today";
 import Cascade from "../tools/Cascade";
 import Radar from "../tools/Radar";
 import Ask from "../tools/Ask";
@@ -13,6 +14,7 @@ import Build from "../tools/Build";
 import NewProject from "../tools/NewProject";
 
 const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
+  today: { title: "Today", sub: "What needs you right now — read for you, in plain English.", el: Today },
   cascade: { title: "Delay Cascade Simulator", sub: "Slip a material and watch what breaks.", el: Cascade },
   radar: { title: "Risk Radar", sub: "Every material's breaking point, crossed with confidence.", el: Radar },
   ask: { title: "Ask Foreman", sub: "Query the project in plain English — watch it reason.", el: Ask },
@@ -21,10 +23,12 @@ const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
 };
 
 export default function Dashboard() {
-  const { tool = "cascade" } = useParams();
+  // Landing on the dashboard should answer "what needs me?" before it offers
+  // tools to drive — so the default is the brief, not the simulator.
+  const { tool = "today" } = useParams();
   const { project } = useProject();
   const { start, steps: activeTour } = useTour();
-  const active = TOOLS[tool] ?? TOOLS.cascade;
+  const active = TOOLS[tool] ?? TOOLS.today;
   const Tool = active.el;
 
   // First-ever dashboard visit → spotlight tour of the shell (project switcher,

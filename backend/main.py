@@ -177,6 +177,13 @@ def alt_supplier(material_id: str):
     return _jsonable(recommend(material_id))
 
 
+@app.get("/api/today")
+def today():
+    """The morning brief: what needs attention, in plain language, ranked."""
+    from today import brief                                  # noqa: PLC0415
+    return _jsonable(brief(projects.get_active_project()))
+
+
 # ---------------------------------------------------------------- money
 @app.get("/api/money")
 def money_settings():

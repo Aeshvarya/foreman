@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
 import { api, type Material, type CascadeReport, type AltSupplier, type CascadeScene } from "../lib/api";
 import { useProject } from "../lib/useProject";
@@ -16,7 +17,12 @@ const input = "rounded-lg border border-line bg-black/30 px-3 py-2 text-sm outli
 export default function Cascade() {
   const { project } = useProject();
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [delays, setDelays] = useState<Record<string, number>>({ "MAT-1": 5 });
+  // Arriving from a "Try it" button on Today means the user already has a
+  // material in mind — open on that one, slipped by the week the brief priced.
+  const [search] = useSearchParams();
+  const fromBrief = search.get("slip");
+  const [delays, setDelays] = useState<Record<string, number>>(
+    fromBrief ? { [fromBrief]: 7 } : { "MAT-1": 5 });
   const [debouncedDelays, setDebouncedDelays] = useState(delays);
   const [report, setReport] = useState<CascadeReport | null>(null);
   const [alts, setAlts] = useState<Record<string, AltSupplier>>({});

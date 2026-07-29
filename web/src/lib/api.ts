@@ -74,6 +74,26 @@ export interface CascadeScene {
   mitigation: string;
 }
 
+/** The morning brief — the project read on the user's behalf and phrased as
+ * sentences, so the home page never demands that they know what to ask. */
+export interface BriefItem {
+  id: string; name: string; supplier: string;
+  status: "needs you today" | "worth a call" | "keep an eye on it" | "fine";
+  weight: number;
+  slack_days: number | null; slack_text: string;
+  how_sure: string; confidence: number; based_on: string;
+  risk_text: string;
+  week_slip_days: number; week_slip_cost: number; week_slip_cost_label: string;
+  action: string;
+}
+export interface Brief {
+  project: string; handover: string | null;
+  headline: string; tone: "urgent" | "watch" | "calm"; subhead: string;
+  at_stake: number; at_stake_label: string;
+  counts: { urgent: number; watch: number; total: number };
+  items: BriefItem[];
+}
+
 /** The rupee layer. Every amount arrives with a `formula` string and a
  * `source` of "your number" | "assumed", so the UI can always show where a
  * figure came from instead of asking anyone to trust it. */
@@ -170,6 +190,7 @@ export const api = {
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),
   ask: (question: string, scene?: CascadeScene) =>
     post<AskResult>("/api/ask", scene ? { question, scene } : { question }),
+  today: () => get<Brief>("/api/today"),
   money: () => get<MoneySettings>("/api/money"),
   saveMoney: async (patch: Record<string, number | null>) => {
     const r = await fetch("/api/money", {

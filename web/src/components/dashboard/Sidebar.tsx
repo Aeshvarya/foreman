@@ -1,5 +1,5 @@
 import { NavLink, useParams } from "react-router-dom";
-import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp } from "lucide-react";
+import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp, Sun } from "lucide-react";
 import { Wordmark } from "../primitives";
 import ProjectSwitcher from "./ProjectSwitcher";
 import { cn } from "../../lib/cn";
@@ -8,6 +8,7 @@ import { TourTarget } from "../../features/tour/TourTarget";
 import { TOOL_TOUR_ID, TOURS } from "../../features/tour/tours";
 
 const TOOLS = [
+  { slug: "today", label: "Today", icon: Sun },
   { slug: "cascade", label: "Cascade Simulator", icon: Zap },
   { slug: "radar", label: "Risk Radar", icon: Radar },
   { slug: "ask", label: "Ask Foreman", icon: MessageSquareText },
