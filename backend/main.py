@@ -29,6 +29,8 @@ from risk import risk_radar                    # noqa: E402
 from montecarlo import simulate                # noqa: E402
 from alt_supplier import recommend             # noqa: E402
 from agents.brain import answer as brain_answer          # noqa: E402
+import money                                             # noqa: E402
+from recovery import recovery_options                    # noqa: E402
 from agents.kg_builder import (                          # noqa: E402
     build_graph_from_docs, list_docs, save_uploaded_doc, reset_docs,
 )
@@ -173,6 +175,38 @@ def montecarlo():
 @app.get("/api/alt-supplier/{material_id}")
 def alt_supplier(material_id: str):
     return _jsonable(recommend(material_id))
+
+
+# ---------------------------------------------------------------- money
+@app.get("/api/money")
+def money_settings():
+    """The rupee assumptions behind every cost shown in the UI, each labelled
+    'your number' or 'assumed' with the reasoning behind the default."""
+    return money.commercials(projects.get_active_project())
+
+
+@app.put("/api/money")
+def money_update(patch: dict):
+    """Edit the money assumptions. Send a key as null to reset it."""
+    try:
+        clean = money.clean_patch(patch)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    projects.set_commercials(clean)
+    return money.commercials(projects.get_active_project())
+
+
+@app.post("/api/cost-of-delay")
+def cost_of_delay(req: dict):
+    """What a handover slip of N days costs, itemised."""
+    return money.cost_of_delay(int(req.get("slip_days", 0)),
+                               projects.get_active_project())
+
+
+@app.post("/api/recovery")
+def recovery(req: CascadeMultiReq):
+    """Ranked, priced ways to protect the handover date for these delays."""
+    return _jsonable(recovery_options(req.delays, projects.get_active_project()))
 
 
 @app.post("/api/ask")

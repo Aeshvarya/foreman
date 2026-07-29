@@ -71,15 +71,20 @@ class CascadeReport:
 
 
 def forward_pass(g: nx.DiGraph,
-                 arrival_overrides: dict[str, date] | None = None
+                 arrival_overrides: dict[str, date] | None = None,
+                 duration_overrides: dict[str, int] | None = None,
                  ) -> dict[str, ActivitySchedule]:
     """CPM forward pass over the activity network.
 
     An activity can start only when (a) all upstream activities finish and
     (b) all its materials have arrived. `arrival_overrides` lets a scenario
-    shift material arrivals.
+    shift material arrivals; `duration_overrides` lets one shorten an activity
+    (crashing it with overtime / a second shift), which is how the recovery
+    planner prices "work faster on site" against "get the material sooner"
+    using the same schedule math rather than a rule of thumb.
     """
     arrival_overrides = arrival_overrides or {}
+    duration_overrides = duration_overrides or {}
     activities = [n for n, d in g.nodes(data=True) if d["kind"] == ACTIVITY]
     schedule: dict[str, ActivitySchedule] = {}
 
@@ -101,7 +106,8 @@ def forward_pass(g: nx.DiGraph,
             if arrival > earliest:
                 earliest = arrival
 
-        finish = earliest + timedelta(days=node["duration_days"])
+        duration = duration_overrides.get(act_id, node["duration_days"])
+        finish = earliest + timedelta(days=max(0, duration))
         schedule[act_id] = ActivitySchedule(act_id, node["name"], earliest, finish)
 
     return schedule
@@ -163,7 +169,9 @@ def run_cascade(g: nx.DiGraph, material_id: str, delay_days: int) -> CascadeRepo
     return report
 
 
-def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int]) -> CascadeReport:
+def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int],
+                      duration_overrides: dict[str, int] | None = None,
+                      ) -> CascadeReport:
     """Answer: 'if THESE materials slip by these amounts, what breaks?'
 
     Real projects rarely have one late item. An activity that needs several
@@ -173,10 +181,13 @@ def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int]) -> CascadeReport:
     """
     delays = {m: int(d) for m, d in delays.items()
               if m in g.nodes and int(d) > 0 and g.nodes[m].get("kind") == MATERIAL}
+    # Baseline is always the UNCRASHED plan, so a scenario that shortens an
+    # activity shows up as recovered days against the promise, not against a
+    # moved goalpost.
     baseline = forward_pass(g)
     overrides = {m: _d(g.nodes[m]["expected_arrival"]) + timedelta(days=d)
                  for m, d in delays.items()}
-    scenario = forward_pass(g, overrides)
+    scenario = forward_pass(g, overrides, duration_overrides)
     handover_id = g.graph["handover"]
 
     label = ", ".join(f"{m} +{delays[m]}d" for m in delays) or "no delay"

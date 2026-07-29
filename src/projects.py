@@ -95,6 +95,26 @@ def create_project(data: dict) -> str:
     return pid
 
 
+def set_commercials(patch: dict) -> dict:
+    """Store the active project's money settings (penalty/day, overheads…).
+
+    Written onto the project file itself so the numbers travel with the project
+    and survive a restart. A key set to None is a reset — the field disappears
+    and the labelled default takes over again.
+    """
+    pid = get_active_id()
+    proj = load_project_file(pid)
+    current = dict(proj.get("commercials", {}) or {})
+    for key, val in patch.items():
+        if val is None:
+            current.pop(key, None)
+        else:
+            current[key] = val
+    proj["commercials"] = current
+    (PROJECTS_DIR / f"{pid}.json").write_text(json.dumps(proj, indent=2))
+    return current
+
+
 def delete_project(pid: str) -> None:
     idx = _read_index()
     idx["projects"] = [p for p in idx["projects"] if p["id"] != pid]
@@ -168,7 +188,7 @@ def _normalise(data: dict) -> dict:
     if handover not in act_ids:
         handover = activities[-1]["id"]
 
-    return {
+    out = {
         "project": {
             "name": data["project"]["name"].strip(),
             "description": data["project"].get("description", "User-created project."),
@@ -177,6 +197,9 @@ def _normalise(data: dict) -> dict:
         },
         "suppliers": suppliers, "materials": materials, "activities": activities,
     }
+    if isinstance(data.get("commercials"), dict) and data["commercials"]:
+        out["commercials"] = data["commercials"]
+    return out
 
 
 def _acyclic(activities: list[dict]) -> bool:
