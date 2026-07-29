@@ -74,6 +74,45 @@ export interface CascadeScene {
   mitigation: string;
 }
 
+/** The rupee layer. Every amount arrives with a `formula` string and a
+ * `source` of "your number" | "assumed", so the UI can always show where a
+ * figure came from instead of asking anyone to trust it. */
+export interface MoneySetting {
+  key: string; value: number; source: "your number" | "assumed";
+  label: string; plain: string; basis: string;
+}
+export type MoneySettings = Record<string, MoneySetting>;
+
+export interface CostLine {
+  key: string; label: string; plain: string;
+  amount: number; formula: string; source: string; basis: string;
+}
+export interface CostOfDelay {
+  slip_days: number; currency: string;
+  total: number; total_label: string;
+  per_day: number; per_day_label: string;
+  lines: CostLine[]; assumed: boolean;
+}
+
+export interface RecoveryOption {
+  id: string; kind: "expedite" | "switch" | "overtime" | "none";
+  material?: string; activity?: string;
+  title: string; plain: string;
+  days_saved: number;
+  cost: number; cost_label: string;
+  avoided?: number; exposure_after?: number;
+  net: number; net_label: string;
+  feasible: boolean; confidence: string;
+  how: string[]; why: string;
+}
+export interface RecoveryPlan {
+  handover_slip_days: number;
+  exposure: CostOfDelay;
+  options: RecoveryOption[];
+  do_nothing: RecoveryOption;
+  best: RecoveryOption | null;
+}
+
 export interface BuildResult {
   docs: number; facts: number;
   materials: Record<string, {
@@ -131,6 +170,17 @@ export const api = {
   altSupplier: (id: string) => get<AltSupplier>(`/api/alt-supplier/${id}`),
   ask: (question: string, scene?: CascadeScene) =>
     post<AskResult>("/api/ask", scene ? { question, scene } : { question }),
+  money: () => get<MoneySettings>("/api/money"),
+  saveMoney: async (patch: Record<string, number | null>) => {
+    const r = await fetch("/api/money", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `money → ${r.status}`);
+    return r.json() as Promise<MoneySettings>;
+  },
+  costOfDelay: (slip_days: number) => post<CostOfDelay>("/api/cost-of-delay", { slip_days }),
+  recovery: (delays: Record<string, number>) => post<RecoveryPlan>("/api/recovery", { delays }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
   docs: () => get<DocFile[]>("/api/docs"),
   uploadDocs: async (files: File[]) => {

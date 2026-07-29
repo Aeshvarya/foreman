@@ -3,6 +3,7 @@ import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
 import { api, type Material, type CascadeReport, type AltSupplier, type CascadeScene } from "../lib/api";
 import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
+import RecoveryPlan from "../components/RecoveryPlan";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
 import { useTour } from "../features/tour/TourProvider";
@@ -255,6 +256,9 @@ export default function Cascade() {
           </GlassCard>
         </TourTarget>
       )}
+
+      {/* what it costs, and the cheapest ways out — the answer to "so what?" */}
+      <RecoveryPlan delays={debouncedDelays} />
     </div>
   );
 }
