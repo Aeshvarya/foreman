@@ -31,11 +31,12 @@ function FMNode({ data }: NodeProps) {
   return (
     <div className={`w-[172px] rounded-xl border px-3 py-2 backdrop-blur-sm transition-all duration-300 ${styles[state]} ${clickHint} ${faded ? "opacity-[0.28]" : "opacity-100"}`}>
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
-      <div className="flex items-center gap-2">
+      {/* The name is what a site manager recognises; the database id (MAT-1)
+          means nothing to them, so it is kept as the tooltip only. */}
+      <div className="flex items-center gap-2" title={label}>
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-current" : "bg-steel"}`} />
-        <span className="font-mono text-[0.72rem] font-semibold">{label}</span>
+        <span className="truncate text-[0.72rem] font-semibold leading-tight">{name}</span>
       </div>
-      <div className="mt-0.5 truncate pl-3.5 text-[0.68rem] leading-tight text-faint">{name}</div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
     </div>
   );
@@ -162,7 +163,7 @@ export default function GraphCanvas({
           <span className="kicker !text-amber/80">↳ click materials to slip several at once</span>
         </Panel>
         <Panel position="bottom-right" className="!m-4 flex flex-wrap gap-3 rounded-lg border border-line bg-elev/70 px-3 py-2 backdrop-blur">
-          {[["delayed", "var(--amber)"], ["on critical path", "var(--red)"], ["handover", "var(--green)"], ["absorbed by float", "var(--steel)"]].map(([l, c]) => (
+          {[["running late", "var(--amber)"], ["pushed back", "var(--red)"], ["handover", "var(--green)"], ["not affected", "var(--steel)"]].map(([l, c]) => (
             <span key={l} className="flex items-center gap-1.5 text-[0.68rem] text-muted">
               <span className="h-2 w-2 rounded-full" style={{ background: c as string }} />{l}
             </span>

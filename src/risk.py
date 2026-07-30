@@ -66,14 +66,16 @@ def risk_radar(g: nx.DiGraph | None = None) -> list[MaterialRisk]:
         exposure = 0.0 if bp is None else exposure
         score = round(exposure * (1.5 - conf), 3)
 
+        # Verdicts are read by site staff, not schedulers — so they say what to
+        # do and why in words a foreman would use, not "slack" and "float".
         if bp is not None and bp <= 10 and conf < 0.8:
-            verdict = "🔴 CHASE TODAY — tight slack + unverified status"
+            verdict = "🔴 CHASE TODAY — barely any room, and nobody has confirmed where it is"
         elif bp is not None and bp <= 7:
-            verdict = "🟠 WATCH CLOSELY — on/near critical path"
+            verdict = "🟠 WATCH CLOSELY — this one decides the handover date"
         elif bp is not None and conf < 0.75:
-            verdict = "🟡 VERIFY STATUS — unconfirmed, some slack"
+            verdict = "🟡 GET IT CONFIRMED — no firm update, though there is some room"
         else:
-            verdict = "🟢 HEALTHY — slack covers current uncertainty"
+            verdict = "🟢 FINE — enough room to take a slip without moving the date"
 
         out.append(MaterialRisk(
             material_id=mat_id, name=node["name"],

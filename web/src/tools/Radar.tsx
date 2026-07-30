@@ -7,6 +7,15 @@ import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
 
+/** Same wording as the Today brief and the simulator, so the whole app speaks
+ *  with one voice instead of three. */
+function sureness(confidence: number): string {
+  if (confidence >= 0.9) return "confirmed";
+  if (confidence >= 0.8) return "fairly sure";
+  if (confidence >= 0.65) return "not confirmed";
+  return "a guess";
+}
+
 function tone(verdict: string): { tone: "red" | "amber" | "green" | "steel"; label: string } {
   const label = verdict.replace(/^[^\w]+/, "").split("—")[0].trim();
   if (verdict.startsWith("🔴")) return { tone: "red", label };
@@ -72,7 +81,9 @@ export default function Radar() {
         {risk.map((r) => {
           const { tone: t, label } = tone(r.verdict);
           const pct = r.breaking_point_days === null ? 100 : Math.max(6, Math.round((r.breaking_point_days / 45) * 100));
-          const bp = r.breaking_point_days === null ? "no break within 45d" : `breaks handover after ${r.breaking_point_days} days`;
+          const bp = r.breaking_point_days === null
+            ? "plenty of room — a delay here has somewhere to go"
+            : `can slip ${r.breaking_point_days} day${r.breaking_point_days === 1 ? "" : "s"} before the handover date moves`;
           return (
             <GlassCard key={r.material_id} hover className="p-5">
               <div className="flex items-center justify-between gap-3">
@@ -80,11 +91,11 @@ export default function Radar() {
                 <span className="font-mono text-xs text-faint">risk {r.risk_score}</span>
               </div>
               <div className="mt-3 font-display text-lg font-bold">
-                {r.name} <span className="font-sans text-sm font-normal text-faint">· {r.material_id} · {r.supplier}</span>
+                {r.name} <span className="font-sans text-sm font-normal text-faint">· from {r.supplier}</span>
               </div>
               <div className="mt-1 text-sm text-muted">
-                {bp} · confidence <b className="text-text">{Math.round(r.confidence * 100)}%</b>
-                <span className="text-faint"> ({r.confidence_source})</span>
+                {bp} · status is <b className="text-text">{sureness(r.confidence)}</b>
+                <span className="text-faint"> (based on {r.confidence_source})</span>
               </div>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barColor(t) }} />

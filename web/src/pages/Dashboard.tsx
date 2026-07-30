@@ -15,11 +15,11 @@ import NewProject from "../tools/NewProject";
 
 const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
   today: { title: "Today", sub: "What needs you right now — read for you, in plain English.", el: Today },
-  cascade: { title: "Delay Cascade Simulator", sub: "Slip a material and watch what breaks.", el: Cascade },
-  radar: { title: "Risk Radar", sub: "Every material's breaking point, crossed with confidence.", el: Radar },
-  ask: { title: "Ask Foreman", sub: "Query the project in plain English — watch it reason.", el: Ask },
-  build: { title: "Build from Docs", sub: "Construct the graph from raw project documents.", el: Build },
-  new: { title: "New Project", sub: "Enter a project's data and start simulating — no files, no code.", el: NewProject },
+  cascade: { title: "Delay Cascade Simulator", sub: "Say something's running late and see exactly what it breaks — and what the fix costs.", el: Cascade },
+  radar: { title: "Risk Radar", sub: "How much each delivery can slip before your handover date moves.", el: Radar },
+  ask: { title: "Ask Foreman", sub: "Ask about the project in your own words, and watch it work the answer out.", el: Ask },
+  build: { title: "Build from Docs", sub: "Point it at your emails and delivery notes — it reads them and builds the picture.", el: Build },
+  new: { title: "New Project", sub: "Describe your project in a sentence, or upload the spreadsheet you already have.", el: NewProject },
 };
 
 export default function Dashboard() {
@@ -56,8 +56,8 @@ export default function Dashboard() {
               {[
                 [project.counts.suppliers, "suppliers"],
                 [project.counts.materials, "materials"],
-                [project.counts.activities, "activities"],
-                [project.counts.edges, "graph edges"],
+                [project.counts.activities, "jobs on site"],
+                [project.counts.edges, "connections"],
               ].map(([v, l]) => (
                 <div key={l} className="text-right">
                   <div className="font-display text-lg font-bold leading-none">{v}</div>

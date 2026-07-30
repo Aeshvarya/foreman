@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, ShieldCheck, Wrench, Truck, X } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Truck, X } from "lucide-react";
 import { api, type Material, type CascadeReport, type AltSupplier, type CascadeScene } from "../lib/api";
 import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
@@ -15,6 +15,15 @@ import { TOURS } from "../features/tour/tours";
 import { SCENE_KEY } from "../lib/scene";
 
 const input = "rounded-lg border border-line bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber/50";
+
+/** A percentage makes people nod without understanding. Words don't. Mirrors
+ *  the wording the Today brief uses so the app sounds like one voice. */
+function sureness(confidence: number): string {
+  if (confidence >= 0.9) return "confident";
+  if (confidence >= 0.8) return "fairly sure";
+  if (confidence >= 0.65) return "not confident";
+  return "really not sure";
+}
 
 export default function Cascade() {
   const { project } = useProject();
@@ -169,7 +178,7 @@ export default function Cascade() {
               {Object.entries(delays).map(([id, days]) => (
                 <div key={id} className="rounded-lg border border-amber/20 bg-amber/[0.04] p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm"><b className="font-mono text-amber">{id}</b> <span className="text-muted">{name(id)}</span></span>
+                    <span className="text-sm text-text">{name(id)}</span>
                     <button onClick={() => toggle(id)} className="text-faint hover:text-red"><X size={15} /></button>
                   </div>
                   <div className="flex items-center gap-3">
@@ -197,9 +206,11 @@ export default function Cascade() {
                   : <>Handover holds — <span className="text-green">float absorbs it</span></>}
               </div>
               <div className="mt-0.5 text-sm text-muted">
-                combined effect of {Object.keys(debouncedDelays).length} delayed material(s)
-                {" · "}{report.baseline_handover} {breaks && <>→ <span className="text-text">{report.handover_date}</span></>}
-                {" · "}weakest confidence <b className="text-text">{Math.round(report.confidence * 100)}%</b>
+                with {Object.keys(debouncedDelays).length} material
+                {Object.keys(debouncedDelays).length !== 1 && "s"} running late
+                {" · "}handover {report.baseline_handover}
+                {breaks && <> → <span className="text-text">{report.handover_date}</span></>}
+                {" · "}we're <b className="text-text">{sureness(report.confidence)}</b> of the dates
               </div>
             </div>
           </GlassCard>
@@ -219,30 +230,27 @@ export default function Cascade() {
 
       {/* details */}
       {report && (
-        <TourTarget name="cascade-details" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TourTarget name="cascade-details" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <GlassCard className="p-5">
-            <Kicker className="mb-3">Activities that slip · {report.slipped.length}</Kicker>
+            <Kicker className="mb-3">Jobs pushed back · {report.slipped.length}</Kicker>
             {report.slipped.length === 0
-              ? <div className="text-sm text-muted">None — schedule float absorbs the combined delay.</div>
+              ? <div className="text-sm text-muted">None — there's enough spare time in the schedule to absorb this.</div>
               : <div className="flex flex-col gap-2">
                   {report.slipped.slice(0, 6).map((s) => (
-                    <div key={s.activity} className="flex items-center justify-between text-sm">
-                      <span><b className="font-mono text-red">{s.activity}</b> <span className="text-muted">{s.name}</span></span>
-                      <span className="font-mono text-xs text-faint">+{s.slip_days}d</span>
+                    <div key={s.activity} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate text-muted">{s.name}</span>
+                      <span className="shrink-0 font-mono text-xs text-red">
+                        {s.slip_days} day{s.slip_days !== 1 && "s"} later
+                      </span>
                     </div>
                   ))}
                   {report.slipped.length > 6 && <div className="text-xs text-faint">+{report.slipped.length - 6} more</div>}
                 </div>}
             {report.absorbed.length > 0 && (
               <div className="mt-3 border-t border-line pt-3 text-xs text-muted">
-                <span className="text-green">{report.absorbed.length}</span> absorbed by float
+                <span className="text-green">{report.absorbed.length}</span> more had spare time and weren't affected
               </div>
             )}
-          </GlassCard>
-
-          <GlassCard className="border-amber/20 p-5">
-            <div className="mb-2 flex items-center gap-2"><Wrench size={15} className="text-amber" /><span className="kicker">Mitigation</span></div>
-            <p className="text-sm leading-relaxed text-muted">{report.mitigation}</p>
           </GlassCard>
 
           <GlassCard className={cn("p-5", breaks && "border-amber/20")}>
@@ -257,9 +265,10 @@ export default function Cascade() {
                     ? <div className="text-sm text-muted">No fast switch — expedite the current orders.</div>
                     : <div className="flex flex-col gap-2">
                         {rows.map(({ id, x }) => (
-                          <div key={id} className="flex items-center justify-between text-sm">
-                            <span className="text-text">{x.name} <span className="text-faint text-xs">for {id}</span></span>
-                            <Badge tone="green">meets ROJ</Badge>
+                          <div key={id} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="min-w-0 truncate text-text">{x.name}
+                              <span className="text-faint text-xs"> for {name(id)}</span></span>
+                            <Badge tone="green">can still make it</Badge>
                           </div>
                         ))}
                       </div>;
