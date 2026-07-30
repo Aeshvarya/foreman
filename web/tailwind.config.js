@@ -13,12 +13,15 @@ export default {
         text: "var(--text)",
         muted: "var(--muted)",
         faint: "var(--faint)",
-        amber: "var(--amber)",
-        "amber-bright": "var(--amber-bright)",
-        red: "var(--red)",
-        green: "var(--green)",
-        steel: "var(--steel)",
-        "steel-bright": "var(--steel-bright)",
+        // Channel form so opacity modifiers actually work: bg-amber/10 has to
+        // produce a 10% amber wash, not nothing. A bare var(--amber) silently
+        // drops the alpha, which left every tint in the UI transparent.
+        amber: "rgb(var(--amber-rgb) / <alpha-value>)",
+        "amber-bright": "rgb(var(--amber-bright-rgb) / <alpha-value>)",
+        red: "rgb(var(--red-rgb) / <alpha-value>)",
+        green: "rgb(var(--green-rgb) / <alpha-value>)",
+        steel: "rgb(var(--steel-rgb) / <alpha-value>)",
+        "steel-bright": "rgb(var(--steel-bright-rgb) / <alpha-value>)",
       },
       fontFamily: {
         display: ['"Bricolage Grotesque Variable"', "sans-serif"],

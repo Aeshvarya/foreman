@@ -19,6 +19,18 @@
   --green: #5bc48a;
   --steel: #7f93ad;
   --steel-bright: #a9bcd6;
+
+  /* Same colours as raw channels. Tailwind cannot apply an opacity modifier
+     (bg-amber/10, border-red/30) to a bare `var(--x)` — it silently produces
+     no background at all, which is why every tint in the app rendered
+     transparent. The config points at these; the hex vars above stay for the
+     places that use var(--amber) directly (React Flow, SVG, accent-color). */
+  --amber-rgb: 245 166 35;
+  --amber-bright-rgb: 255 195 85;
+  --red-rgb: 240 106 111;
+  --green-rgb: 91 196 138;
+  --steel-rgb: 127 147 173;
+  --steel-bright-rgb: 169 188 214;
 }
 
 * { box-sizing: border-box; }
