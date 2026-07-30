@@ -22,3 +22,6 @@ streamlit>=1.30
 plotly>=5.18
 pandas>=2.0
 pillow>=10.0
+
+# Spreadsheet import (describe-or-upload project setup)
+openpyxl>=3.1

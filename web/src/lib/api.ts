@@ -159,6 +159,16 @@ export interface NewProjectInput {
   activities: { id: string; name: string; duration_days: number; needs_materials: string[]; depends_on: string[] }[];
 }
 
+/** A project understood from a sentence or a spreadsheet, held for the user to
+ * confirm. Nothing is saved until they do. */
+export interface ProjectDraft {
+  draft: NewProjectInput & { project: { name: string; start_date: string; handover_milestone: string } };
+  summary: string;
+  warnings: string[];
+  counts: { suppliers: number; materials: number; activities: number };
+  extracted?: string;
+}
+
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(path);
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
@@ -214,6 +224,14 @@ export const api = {
   resetDocs: () => post<{ removed: number; docs: DocFile[] }>("/api/docs/reset", {}),
   projects: () => get<ProjectMeta[]>("/api/projects"),
   createProject: (data: NewProjectInput) => post<{ id: string }>("/api/projects", data),
+  draftProject: (text: string) => post<ProjectDraft>("/api/projects/draft", { text }),
+  draftProjectFromFile: async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/projects/draft-file", { method: "POST", body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `import → ${r.status}`);
+    return r.json() as Promise<ProjectDraft>;
+  },
   activateProject: (id: string) => post<{ active: string }>(`/api/projects/${id}/activate`, {}),
   deleteProject: (id: string) => del<{ active: string }>(`/api/projects/${id}`),
 };

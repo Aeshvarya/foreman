@@ -271,6 +271,40 @@ def projects_create(data: dict):
     return {"id": pid, "active": pid}
 
 
+@app.post("/api/projects/draft")
+def projects_draft(req: dict):
+    """Describe a project in plain English -> a validated DRAFT to confirm.
+
+    Nothing is saved. The user reviews what we understood, then posts it to
+    /api/projects like any other project.
+    """
+    from agents.project_builder import draft                 # noqa: PLC0415
+    try:
+        return draft(req.get("text", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+
+@app.post("/api/projects/draft-file")
+async def projects_draft_file(file: UploadFile = File(...)):
+    """Same, from the spreadsheet the user already keeps."""
+    from agents.project_builder import draft, spreadsheet_to_text   # noqa: PLC0415
+    content = await file.read()
+    if len(content) > 2_000_000:
+        raise HTTPException(400, f"{file.filename}: too large (max 2MB)")
+    try:
+        text = spreadsheet_to_text(file.filename or "", content)
+        if not text.strip():
+            raise ValueError("that file looks empty")
+        return {**draft(text), "extracted": text[:4000]}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+
 @app.post("/api/projects/{pid}/activate")
 def projects_activate(pid: str):
     try:

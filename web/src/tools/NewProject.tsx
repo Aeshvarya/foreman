@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, Rocket, Loader2, Building2, Package, CalendarClock, Flag } from "lucide-react";
 import { api } from "../lib/api";
 import { GlassCard, Button, Kicker } from "../components/primitives";
+import DescribeProject from "./DescribeProject";
 import { cn } from "../lib/cn";
 
 const uid = () => crypto.randomUUID();
@@ -13,7 +14,17 @@ interface Sup { key: string; name: string; region: string; reliability: string }
 interface Mat { key: string; name: string; supplierKey: string; arrival: string; roj: string; confidence: number }
 interface Act { key: string; name: string; duration: string; needs: string[]; deps: string[] }
 
+/* Two ways in, same destination. Describing it comes first because it is the
+   one a non-technical user can actually start from; the form stays for anyone
+   who wants to place every date themselves. */
 export default function NewProject() {
+  const [mode, setMode] = useState<"describe" | "form">("describe");
+  return mode === "describe"
+    ? <DescribeProject onCancel={() => setMode("form")} />
+    : <FormBuilder onBack={() => setMode("describe")} />;
+}
+
+function FormBuilder({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState("");
   const [start, setStart] = useState(todayISO);
   const [suppliers, setSuppliers] = useState<Sup[]>([{ key: uid(), name: "", region: "west", reliability: "" }]);
@@ -66,10 +77,15 @@ export default function NewProject() {
 
   return (
     <div className="mx-auto max-w-[860px] pb-16">
-      <p className="mb-6 max-w-2xl text-sm leading-relaxed text-muted">
-        Build a project by entering its suppliers, materials and schedule — no files, no code.
-        Foreman fills in the rest and you can simulate delays immediately.
-      </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <p className="max-w-2xl text-sm leading-relaxed text-muted">
+          Build a project by entering its suppliers, materials and schedule — no files, no code.
+          Foreman fills in the rest and you can simulate delays immediately.
+        </p>
+        <button onClick={onBack} className="shrink-0 text-sm text-faint transition hover:text-amber">
+          ← just describe it instead
+        </button>
+      </div>
 
       <Section icon={<CalendarClock size={15} />} title="Project">
         <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
