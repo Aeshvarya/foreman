@@ -133,6 +133,26 @@ export interface RecoveryPlan {
   best: RecoveryOption | null;
 }
 
+/** Week-by-week cost of not acting yet. `option` goes null once nothing can
+ * buy the handover date back at all. */
+export interface WaitingCheckpoint {
+  week: number; date: string; label: string; past_the_point: boolean;
+  option: string | null; kind: string;
+  cost: number; cost_label: string; days_saved: number; why: string;
+}
+export interface Waiting {
+  material: string; name: string; supplier: string;
+  delay_days: number; handover_slip_days: number;
+  exposure: CostOfDelay; safe?: boolean;
+  needed_by: string; expected_arrival: string;
+  discovered_without_foreman: string; warning_days: number;
+  checkpoints: WaitingCheckpoint[];
+  act_now_cost: number; act_now_label: string;
+  wait_cost: number; wait_label: string;
+  options_expire: string | null;
+  headline: string;
+}
+
 export interface BuildResult {
   docs: number; facts: number;
   materials: Record<string, {
@@ -212,6 +232,8 @@ export const api = {
   },
   costOfDelay: (slip_days: number) => post<CostOfDelay>("/api/cost-of-delay", { slip_days }),
   recovery: (delays: Record<string, number>) => post<RecoveryPlan>("/api/recovery", { delays }),
+  costOfWaiting: (material_id: string, delay_days: number) =>
+    post<Waiting>("/api/cost-of-waiting", { material_id, delay_days }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
   docs: () => get<DocFile[]>("/api/docs"),
   uploadDocs: async (files: File[]) => {

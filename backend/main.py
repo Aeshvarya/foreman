@@ -216,6 +216,18 @@ def recovery(req: CascadeMultiReq):
     return _jsonable(recovery_options(req.delays, projects.get_active_project()))
 
 
+@app.post("/api/cost-of-waiting")
+def cost_of_waiting(req: dict):
+    """Week by week: what protecting the handover costs, and when the cheap
+    options physically stop being available."""
+    from timemachine import cost_of_waiting as cow          # noqa: PLC0415
+    try:
+        return _jsonable(cow(req.get("material_id", ""), int(req.get("delay_days", 7)),
+                             project=projects.get_active_project()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.post("/api/ask")
 def ask(req: AskReq):
     return _jsonable(brain_answer(req.question, req.scene))

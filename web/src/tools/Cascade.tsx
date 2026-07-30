@@ -5,6 +5,7 @@ import { api, type Material, type CascadeReport, type AltSupplier, type CascadeS
 import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
 import RecoveryPlan from "../components/RecoveryPlan";
+import CostOfWaiting from "../components/CostOfWaiting";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
 import { useTour } from "../features/tour/TourProvider";
@@ -61,6 +62,9 @@ export default function Cascade() {
   }, [debouncedDelays]);
 
   const breaks = !!report && report.handover_slip_days > 0;
+  // The biggest single slip drives the "cost of waiting" story.
+  const worstDelay = Object.entries(debouncedDelays)
+    .sort((a, b) => b[1] - a[1])[0] as [string, number] | undefined;
 
   // These two Sets are GraphCanvas's memo dependencies, so their *identity*
   // decides whether the graph rebuilds. Built inline with `new Set(...)` they
@@ -265,6 +269,12 @@ export default function Cascade() {
 
       {/* what it costs, and the cheapest ways out — the answer to "so what?" */}
       <RecoveryPlan delays={debouncedDelays} />
+
+      {/* and what it costs to sit on it. Anchored to the worst single delay,
+          because the decay story is about one order's window closing. */}
+      {breaks && worstDelay && (
+        <CostOfWaiting materialId={worstDelay[0]} delayDays={worstDelay[1]} />
+      )}
     </div>
   );
 }
