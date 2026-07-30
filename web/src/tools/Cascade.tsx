@@ -6,6 +6,7 @@ import { useProject } from "../lib/useProject";
 import GraphCanvas from "../components/GraphCanvas";
 import RecoveryPlan from "../components/RecoveryPlan";
 import CostOfWaiting from "../components/CostOfWaiting";
+import TellSomeone from "../components/TellSomeone";
 import { GlassCard, Badge, Kicker } from "../components/primitives";
 import { cn } from "../lib/cn";
 import { useTour } from "../features/tour/TourProvider";
@@ -275,6 +276,9 @@ export default function Cascade() {
       {breaks && worstDelay && (
         <CostOfWaiting materialId={worstDelay[0]} delayDays={worstDelay[1]} />
       )}
+
+      {/* the last mile: the messages this analysis is useless without */}
+      <TellSomeone delays={debouncedDelays} />
     </div>
   );
 }

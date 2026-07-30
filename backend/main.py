@@ -216,6 +216,13 @@ def recovery(req: CascadeMultiReq):
     return _jsonable(recovery_options(req.delays, projects.get_active_project()))
 
 
+@app.post("/api/messages")
+def messages(req: CascadeMultiReq):
+    """Ready-to-send supplier + client messages for the current situation."""
+    from comms import drafts                                # noqa: PLC0415
+    return _jsonable(drafts(req.delays, projects.get_active_project()))
+
+
 @app.post("/api/cost-of-waiting")
 def cost_of_waiting(req: dict):
     """Week by week: what protecting the handover costs, and when the cheap

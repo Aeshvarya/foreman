@@ -153,6 +153,23 @@ export interface Waiting {
   headline: string;
 }
 
+/** Drafted messages for the current situation — templates, not generation, so
+ * they are identical every time and work with no API key. */
+export interface DraftMessage { to: string; subject: string; body: string; }
+export interface Messages {
+  empty: boolean; reason?: string;
+  project?: string; handover_slip_days?: number; exposure?: CostOfDelay;
+  supplier?: DraftMessage; client?: DraftMessage;
+  summary?: {
+    title: string; date: string; verdict: string;
+    handover_was: string; handover_now: string; slip_days: number; exposure_label: string;
+    late: { name: string; supplier: string; days: number; needed_by: string }[];
+    affected: { name: string; slip: number }[];
+    absorbed: number;
+    plan: { title: string; days: number; cost: string; net: string }[];
+  };
+}
+
 export interface BuildResult {
   docs: number; facts: number;
   materials: Record<string, {
@@ -232,6 +249,7 @@ export const api = {
   },
   costOfDelay: (slip_days: number) => post<CostOfDelay>("/api/cost-of-delay", { slip_days }),
   recovery: (delays: Record<string, number>) => post<RecoveryPlan>("/api/recovery", { delays }),
+  messages: (delays: Record<string, number>) => post<Messages>("/api/messages", { delays }),
   costOfWaiting: (material_id: string, delay_days: number) =>
     post<Waiting>("/api/cost-of-waiting", { material_id, delay_days }),
   buildGraph: () => post<BuildResult>("/api/build-graph", {}),
