@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Copy, Check, Printer, HardHat, Briefcase } from "lucide-react";
 import { api, type Messages } from "../lib/api";
-import { GlassCard, Kicker, Badge } from "./primitives";
+import { GlassCard, Badge } from "./primitives";
 import { cn } from "../lib/cn";
 
 /* The last mile: the messages someone actually has to send.

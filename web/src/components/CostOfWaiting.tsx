@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { History, TriangleAlert, EyeOff, Eye } from "lucide-react";
 import { api, type Waiting } from "../lib/api";
-import { GlassCard, Kicker, Badge } from "../components/primitives";
+import { GlassCard, Badge } from "../components/primitives";
 import { cn } from "../lib/cn";
 
 /* "What does waiting cost me?" — the panel that proves early warning is worth

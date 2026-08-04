@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
-import { Send, Brain, ChevronDown } from "lucide-react";
-import { api, type AskResult } from "../lib/api";
-import { GlassCard, Badge, Kicker } from "../components/primitives";
-import { cn } from "../lib/cn";
+import { Send } from "lucide-react";
+import { api, type AskResult, type Citation } from "../lib/api";
+import { GlassCard, Kicker } from "../components/primitives";
+import ReasoningTrail from "../components/ReasoningTrail";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
 import { TOURS } from "../features/tour/tours";
 import { readScene } from "../lib/scene";
 import Thinking from "../components/Thinking";
 
+// Deliberately mixed: the first two are reasoning questions that trigger the
+// deep path (break down -> gather -> self-check), the third is a fast lookup —
+// so the difference in how hard Foreman works is visible in the trail. All
+// phrased the way a site manager would actually say them, no ids or decimals.
 const EXAMPLES = [
-  "Which materials have confidence below 0.75?",
-  "If the diesel generators are delayed, what activities are affected?",
-  "What if the switchgear slips 12 days?",
+  "Which part of this project is most likely to slip, and why?",
+  "Why are the diesel generators the biggest risk?",
+  "When does the switchgear arrive and who's making it?",
 ];
 
 interface Turn { q: string; res?: AskResult; loading?: boolean; }
@@ -98,12 +102,10 @@ export default function Ask() {
               ) : t.res && (
                 <>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">{t.res.answer}</div>
-                  {t.res.citations.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {t.res.citations.map((c) => <Badge key={c} tone="amber">{c}</Badge>)}
-                    </div>
+                  {t.res.citations.length > 0 && <Citations items={t.res.citations} />}
+                  {t.res.trace.length > 0 && (
+                    <ReasoningTrail trace={t.res.trace} mode={t.res.mode} />
                   )}
-                  {t.res.trace.length > 0 && <Trace res={t.res} />}
                 </>
               )}
             </GlassCard>
@@ -126,25 +128,39 @@ export default function Ask() {
   );
 }
 
-function Trace({ res }: { res: AskResult }) {
-  const [open, setOpen] = useState(false);
+
+/** What the answer was built from — a footnote, not a headline.
+ *
+ * Names read in normal case: an all-caps "STRUCTURAL STEEL PACKAGE (ROOF +
+ * MEZZANINE)" shouts at the reader. And a broad question can legitimately touch
+ * a dozen nodes, which is reassuring as a count and unreadable as a wall of
+ * chips — so the list collapses until asked to open.
+ */
+function Citations({ items }: { items: Citation[] }) {
+  const [all, setAll] = useState(false);
+  const LIMIT = 5;
+  const shown = all ? items : items.slice(0, LIMIT);
+  const hidden = items.length - shown.length;
+
   return (
-    <div className="mt-4 border-t border-line pt-3">
-      <button onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 text-xs text-muted transition hover:text-text">
-        <Brain size={13} className="text-amber" />
-        <span className="kicker">reasoning trace · {res.mode}</span>
-        <ChevronDown size={13} className={cn("transition", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="mt-3 flex flex-col gap-2">
-          {res.trace.map((s, i) => (
-            <div key={i} className="rounded-lg border border-line bg-black/30 p-3">
-              <div className="kicker mb-1 text-amber/80">{s.step}</div>
-              <code className="whitespace-pre-wrap font-mono text-xs text-steel-bright">{s.detail}</code>
-            </div>
-          ))}
-        </div>
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      <span className="kicker mr-0.5 text-faint">based on</span>
+      {shown.map((c) => (
+        <span
+          key={c.id}
+          title={c.id}
+          className="rounded-full border border-amber/25 bg-amber/[0.08] px-2.5 py-0.5 text-[0.72rem] text-amber/90"
+        >
+          {c.name}
+        </span>
+      ))}
+      {hidden > 0 && (
+        <button
+          onClick={() => setAll(true)}
+          className="rounded-full border border-line px-2.5 py-0.5 text-[0.72rem] text-muted transition hover:border-amber/40 hover:text-text"
+        >
+          +{hidden} more
+        </button>
       )}
     </div>
   );

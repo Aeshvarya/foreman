@@ -1,3 +1,4 @@
+import type React from "react";
 import { useCallback, useEffect, useRef, type PropsWithChildren } from "react";
 import { useTour } from "./TourProvider";
 
@@ -42,7 +43,11 @@ export function TourTarget({
   useEffect(() => () => clearRect(name), [name, clearRect]);
 
   return (
-    <As ref={ref} className={className}>
+    // `As` is polymorphic ("div" | "nav") so TS can't narrow the ref to one
+    // concrete element type; both are HTMLElement at runtime, which is all the
+    // measuring above needs. The cast is the standard accommodation for a
+    // polymorphic `as` prop, not a papered-over bug.
+    <As ref={ref as React.Ref<HTMLDivElement>} className={className}>
       {children}
     </As>
   );

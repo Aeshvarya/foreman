@@ -16,6 +16,9 @@ export interface GraphEdge { source: string; target: string; kind: string; }
 export interface Project {
   name: string;
   handover: string;
+  /** True when the active project is the bundled synthetic demo, so the UI can
+   * label it as such on screen rather than only in the README. */
+  demo?: boolean;
   counts: { suppliers: number; materials: number; activities: number; edges: number };
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -54,9 +57,15 @@ export interface AltSupplier {
   }[];
 }
 
-export interface TraceStep { step: string; detail: string; }
+/** One recorded reasoning step. `detail` is the technical record (the Cypher,
+ * row counts); `say` is the same step in plain English for the on-screen trail.
+ * `say` is optional so turns cached from an older build still render. */
+export interface TraceStep { step: string; detail: string; say?: string; }
+/** A cited graph node. `name` is what a site manager reads; `id` is kept for
+ * the technical view and as a fallback. */
+export interface Citation { id: string; name: string; }
 export interface AskResult {
-  answer: string; citations: string[]; trace: TraceStep[]; mode: "query" | "cascade" | "scene";
+  answer: string; citations: Citation[]; trace: TraceStep[]; mode: "query" | "cascade" | "scene";
 }
 
 /** Snapshot of the live Cascade Simulator state, sent to /api/ask so the

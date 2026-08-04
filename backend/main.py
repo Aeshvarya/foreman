@@ -126,9 +126,18 @@ def project():
     ]
     edges = [{"source": u, "target": v, "kind": d.get("kind")}
              for u, v, d in g.edges(data=True)]
+    # Is the user looking at the bundled demo, or a project they built? The UI
+    # uses this to label demo data as synthetic on screen — an honesty claim
+    # only counts if it's visible in the app, not just in the README.
+    try:
+        demo = any(p.get("active") and p.get("seed") for p in projects.list_projects())
+    except Exception:
+        demo = False
+
     return {
         "name": g.graph.get("name"),
         "handover": g.graph.get("handover"),
+        "demo": demo,
         "counts": {
             "suppliers": kinds.count(SUPPLIER),
             "materials": kinds.count(MATERIAL),

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
 import ErrorBoundary from "../components/ErrorBoundary";
+import DataProvenance from "../components/DataProvenance";
 import { useProject } from "../lib/useProject";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
@@ -68,6 +69,7 @@ export default function Dashboard() {
           )}
         </header>
         <div className="px-8 py-7">
+          {project?.demo && <DataProvenance />}
           <ErrorBoundary key={tool}>
             <Tool />
           </ErrorBoundary>

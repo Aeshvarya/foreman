@@ -72,7 +72,7 @@ export const TOURS: Record<string, TourStep[]> = {
     {
       target: "ask-input",
       title: "It writes its own queries.",
-      body: "Foreman classifies your question, writes and runs the graph query itself, and answers with citations. Expand \"reasoning trace\" under any answer to see every step it took.",
+      body: "Ask a reasoning question and Foreman breaks it into smaller ones, checks its own answer against the evidence, and shows you every step in plain English. \"How Foreman worked this out\" sits under each answer — flip on the technical detail to see the actual graph queries it wrote.",
     },
   ],
 

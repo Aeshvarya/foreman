@@ -19,11 +19,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agents.cascade_agent import explain_cascade, narrate_scene   # noqa: E402
 from agents.query_agent import ask                  # noqa: E402
+from db import get_graph                            # noqa: E402
 
 # Signals that the user is describing a delay scenario to simulate.
 _WHATIF = re.compile(
     r"\b(what if|what happens if|if .+ (slips?|delayed?|late|slip)|"
     r"slips? \d+|delayed? by|push(ed)? back|misses? its? roj)\b", re.I)
+
+
+def _label(citations: list) -> list[dict]:
+    """Turn cited graph ids into things a human recognises.
+
+    The agents cite nodes by id (MAT-6, SUP-2) because that is what the graph
+    returns and what the technical trace should show. Nobody on a building site
+    calls a generator "MAT-6", so every citation that reaches the screen is
+    resolved to its real name here — one place, so the query agent, the cascade
+    agent and the scene narrator all benefit. The id travels alongside for the
+    technical view and as a fallback if a node has since gone.
+    """
+    try:
+        g = get_graph()
+    except Exception:
+        return [{"id": c, "name": c} for c in citations]
+    out = []
+    for c in citations:
+        node = g.nodes.get(c) if hasattr(g, "nodes") else None
+        out.append({"id": c, "name": (node or {}).get("name", c) if node else c})
+    return out
 
 
 def answer(question: str, scene: dict | None = None) -> dict:
@@ -38,15 +60,17 @@ def answer(question: str, scene: dict | None = None) -> dict:
     if scene is not None:
         res = narrate_scene(question, scene)
         res["mode"] = "scene"
+        res["citations"] = _label(res.get("citations", []))
         return res
     if _WHATIF.search(question):
         res = explain_cascade(question)
         res["mode"] = "cascade"
+        res["citations"] = _label(res.get("citations", []))
         return res
     res = ask(question)
     return {
         "answer": res.get("answer", ""),
-        "citations": res.get("citations", []),
+        "citations": _label(res.get("citations", [])),
         "trace": res.get("trace", []),
         "mode": "query",
     }

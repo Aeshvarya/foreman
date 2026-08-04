@@ -119,7 +119,7 @@ export default function ChatWidget() {
                       {m.res && m.res.citations.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {m.res.citations.map((c) => (
-                            <span key={c} className="rounded-full border border-amber/30 bg-amber/10 px-2 py-0.5 font-mono text-[0.6rem] text-amber">{c}</span>
+                            <span key={c.id} className="rounded-full border border-amber/30 bg-amber/10 px-2 py-0.5 text-[0.6rem] text-amber">{c.name}</span>
                           ))}
                         </div>
                       )}
