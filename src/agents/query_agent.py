@@ -298,6 +298,42 @@ def decompose_node(state: QueryState) -> QueryState:
     return state
 
 
+def _word_for(key: str, value: float) -> str | None:
+    """Turn a stored score into the phrase the rest of the app already uses.
+
+    Confidence and supplier reliability are different things and must not be
+    described with the same words — "confirmed" is about whether we know where
+    something is, "hits their dates" is about a track record.
+    """
+    k = key.lower()
+    if "confidence" in k:
+        if value >= 0.9:
+            return "confirmed"
+        if value >= 0.75:
+            return "fairly sure"
+        return "not confirmed"
+    if "reliability" in k:
+        if value >= 0.9:
+            return "usually hits their dates"
+        if value >= 0.75:
+            return "mostly reliable"
+        return "patchy record"
+    return None
+
+
+def _humanise(rows):
+    """Replace score values with words anywhere in the evidence rows."""
+    if isinstance(rows, list):
+        return [_humanise(r) for r in rows]
+    if isinstance(rows, dict):
+        out = {}
+        for k, v in rows.items():
+            word = _word_for(k, v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+            out[k] = word if word is not None else _humanise(v)
+        return out
+    return rows
+
+
 def answer_node(state: QueryState) -> QueryState:
     q = state["question"]
     evidence = state.get("evidence", [])
@@ -306,7 +342,8 @@ def answer_node(state: QueryState) -> QueryState:
     if not rows_total:
         state["answer"] = (
             "I couldn't find that in the project graph. Try naming a specific "
-            "material, supplier, or activity — e.g. 'the switchgear' or 'MAT-2'."
+            "material, supplier, or job — e.g. 'the switchgear' or 'the diesel "
+            "generators'."
         )
         state["citations"] = []
         _add_trace(state, "answer", "no rows / gave guidance",
@@ -314,17 +351,27 @@ def answer_node(state: QueryState) -> QueryState:
         return state
 
     gap = state.get("gap")
+    # Scores are turned into words BEFORE the model sees them. Asking it in the
+    # prompt not to quote decimals half-worked and then backfired: it started
+    # quoting the thresholds from the instruction itself ("confidence is below
+    # 0.75"). If the number never reaches the prompt, it cannot be echoed.
     body = "\n".join(
-        f"- For '{e['question']}': {e['rows']}" for e in evidence if e.get("rows")
+        f"- For '{e['question']}': {_humanise(e['rows'])}"
+        for e in evidence if e.get("rows")
     )
     prompt = (
         "You are Foreman, a construction supply-chain analyst talking to a site "
         "manager. Answer the question from ONLY this graph data.\n"
         "STYLE: plain English, concrete, no jargon and no fluff. Use the "
-        "material/supplier NAMES, not database ids. Give dates plainly. If a "
-        "confidence value is present, say what it means in words (0.9+ "
-        "\"confirmed\", 0.75-0.9 \"likely\", below 0.75 \"unconfirmed\") rather "
-        "than quoting the decimal. Lead with the answer, then the reason.\n"
+        "material/supplier NAMES, not database ids. Give dates plainly. "
+        "Lead with the answer, then the reason.\n"
+        "Scores already arrive as words (\"confirmed\", \"patchy record\") — "
+        "use them as given and never turn them back into numbers.\n"
+        "Only mention a supplier's record when it actually helps answer the "
+        "question. Never tack it on, and never call a supplier reliable in the "
+        "same breath as holding them responsible for a delay — that reads as a "
+        "contradiction. If the data does not support the question's premise, "
+        "say so plainly rather than inventing a reason for it.\n"
         + (f"\nA self-check found this was missing last time — make sure the "
            f"answer now covers it: {gap}\n" if gap else "")
         + f"\nQuestion: {q}\nGraph data:\n{body}"
