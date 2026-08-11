@@ -4,17 +4,17 @@
 # the JSON mirror in src/db.py (parity-tested against Neo4j in tests/), so the
 # link a judge clicks is live whether or not a graph database is reachable.
 # To upgrade to real Cypher, add the three NEO4J_* vars in the dashboard.
+#
+# `plan` is deliberately omitted: Render's blueprint validator rejects
+# `plan: free` for web services ("no such plan free"). Leaving it out takes
+# the account default, and the instance type is selectable in the dashboard.
 services:
   - type: web
     name: foreman
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
     healthCheckPath: /api/health
     envVars:
       # Set in the dashboard, never committed.
       - key: GEMINI_API_KEY
         sync: false
-      # Same-origin in production; kept explicit so it is never hardcoded again.
-      - key: ALLOWED_ORIGINS
-        value: ""
