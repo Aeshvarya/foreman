@@ -30,8 +30,14 @@ except ImportError:  # when src/ is already on sys.path (Streamlit)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 NEO4J_URI = os.getenv("NEO4J_URI", "")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+# Aura names the user after the instance id, not "neo4j", and ships the value
+# as NEO4J_USERNAME in its credentials file — accept either spelling so the
+# downloaded file can be pasted in as-is.
+NEO4J_USER = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME") or "neo4j"
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "foreman123")
+# Aura also names the database after the instance; empty means "server default",
+# which is what local Docker wants.
+NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "")
 
 # Node labels in Neo4j (title-case of the NetworkX `kind` strings).
 _LABEL = {SUPPLIER: "Supplier", MATERIAL: "Material", ACTIVITY: "Activity"}
@@ -73,11 +79,17 @@ def _driver():
     return _DRIVER
 
 
+def _session():
+    """A session on the configured database (server default when unset)."""
+    return (_driver().session(database=NEO4J_DATABASE) if NEO4J_DATABASE
+            else _driver().session())
+
+
 # --------------------------------------------------------------------- load
 def load_to_neo4j(project: dict | None = None) -> dict:
     """Wipe and repopulate Neo4j from the project dict. Returns counts."""
     project = project or load_project()
-    with _driver().session() as s:
+    with _session() as s:
         s.run("MATCH (n) DETACH DELETE n")
 
         # Project meta node (carries handover milestone for the graph mirror).
@@ -129,7 +141,7 @@ def graph_from_neo4j() -> nx.DiGraph:
     Node ids + attributes and edge kinds match `graph.build_graph` so the CPM
     engine consumes it identically.
     """
-    with _driver().session() as s:
+    with _session() as s:
         meta = s.run(
             "MATCH (p:Project) RETURN p.name AS name, p.handover AS handover"
         ).single()
@@ -202,7 +214,7 @@ The handover milestone is the Activity whose id == (:Project).handover.
 
 def run_cypher(query: str, params: dict | None = None) -> list[dict]:
     """Execute read Cypher, return rows as dicts (used by the query agent)."""
-    with _driver().session() as s:
+    with _session() as s:
         return [r.data() for r in s.run(query, params or {})]
 
 
@@ -211,12 +223,12 @@ def update_material(mat_id: str, props: dict) -> None:
     Material node. Used by the KG Builder to keep status current from docs."""
     if not neo4j_enabled():
         return                       # no mirror to update; caller keeps the JSON
-    with _driver().session() as s:
+    with _session() as s:
         s.run("MATCH (m:Material {id:$id}) SET m += $props", id=mat_id, props=props)
 
 
 def verify(silent: bool = False) -> dict:
-    with _driver().session() as s:
+    with _session() as s:
         counts = {
             "suppliers": s.run("MATCH (n:Supplier) RETURN count(n) AS c").single()["c"],
             "materials": s.run("MATCH (n:Material) RETURN count(n) AS c").single()["c"],
