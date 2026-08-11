@@ -1,0 +1,28 @@
+# Keep the build context small and the image reproducible.
+.git
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+.DS_Store
+
+# Secrets never enter the image — Render/Fly inject them as env vars.
+.env
+
+# Built/installed artefacts: the image builds its own.
+web/node_modules
+web/dist
+
+# Runtime state: the container seeds its own from data/project.json on boot,
+# so a deploy always opens on the clean demo rather than a laptop's leftovers.
+data/projects
+data/.llm_cache.json
+
+# Local-only material.
+study
+screenshots
+docs
+tests
+app.py
+docker-compose.yml
+dev.sh

@@ -29,7 +29,7 @@ except ImportError:  # when src/ is already on sys.path (Streamlit)
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_URI = os.getenv("NEO4J_URI", "")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "foreman123")
 
@@ -37,7 +37,25 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "foreman123")
 _LABEL = {SUPPLIER: "Supplier", MATERIAL: "Material", ACTIVITY: "Activity"}
 
 
+class Neo4jUnavailable(RuntimeError):
+    """Raised when graph-store access is attempted with no Neo4j configured."""
+
+
+def neo4j_enabled() -> bool:
+    """Is there a graph store to talk to at all?
+
+    Presence of NEO4J_URI is the switch. Locally `.env` sets it and everything
+    behaves exactly as before. A deployed container with no Neo4j simply never
+    dials — which matters more than it looks: without this the driver spends
+    its full connection timeout failing on every request, and startup burns
+    ~16s in the retry loop before the first page can render.
+    """
+    return bool(NEO4J_URI)
+
+
 def _driver():
+    if not neo4j_enabled():
+        raise Neo4jUnavailable("NEO4J_URI is not set")
     from neo4j import GraphDatabase
     return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
@@ -118,11 +136,28 @@ def graph_from_neo4j() -> nx.DiGraph:
 
 def get_graph() -> nx.DiGraph:
     """The graph the app/agents use: Neo4j-backed, JSON fallback for resilience."""
+    if not neo4j_enabled():          # deployed without a graph store: go direct
+        return build_graph()
     try:
         return graph_from_neo4j()
     except Exception as e:  # Docker down mid-demo -> never crash the UI
         print(f"[db] Neo4j unavailable ({e}); falling back to project.json")
         return build_graph()
+
+
+def load_to_neo4j_if_enabled(project: dict | None = None) -> dict | None:
+    """Best-effort mirror push. Returns None when there is nothing to push to.
+
+    The JSON project file is the durable record either way — Neo4j is a mirror
+    built from it — so a failed push must never fail the request that caused it.
+    """
+    if not neo4j_enabled():
+        return None
+    try:
+        return load_to_neo4j(project)
+    except Exception as e:
+        print(f"[db] Neo4j load skipped: {str(e)[:160]}")
+        return None
 
 
 # --------------------------------------------------------------------- misc
@@ -161,6 +196,8 @@ def run_cypher(query: str, params: dict | None = None) -> list[dict]:
 def update_material(mat_id: str, props: dict) -> None:
     """Write extracted evidence (confidence, source, conflict flag) onto a
     Material node. Used by the KG Builder to keep status current from docs."""
+    if not neo4j_enabled():
+        return                       # no mirror to update; caller keeps the JSON
     with _driver() as drv, drv.session() as s:
         s.run("MATCH (m:Material {id:$id}) SET m += $props", id=mat_id, props=props)
 

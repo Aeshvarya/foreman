@@ -1,0 +1,20 @@
+# Foreman on Render — one Docker service, one public URL.
+#
+# Neo4j is intentionally NOT required here. With no NEO4J_URI the app runs on
+# the JSON mirror in src/db.py (parity-tested against Neo4j in tests/), so the
+# link a judge clicks is live whether or not a graph database is reachable.
+# To upgrade to real Cypher, add the three NEO4J_* vars in the dashboard.
+services:
+  - type: web
+    name: foreman
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      # Set in the dashboard, never committed.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Same-origin in production; kept explicit so it is never hardcoded again.
+      - key: ALLOWED_ORIGINS
+        value: ""

@@ -8,6 +8,7 @@ Run:  uvicorn backend.main:app --reload --port 8000
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from dataclasses import asdict
@@ -16,6 +17,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # Make src/ importable so the brain modules' bare imports resolve.
@@ -23,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import time
 
-from db import get_graph, load_to_neo4j        # noqa: E402
+from db import get_graph, load_to_neo4j_if_enabled, neo4j_enabled   # noqa: E402
 from cascade import run_cascade, run_cascade_multi   # noqa: E402
 from risk import risk_radar                    # noqa: E402
 from montecarlo import simulate                # noqa: E402
@@ -39,18 +42,30 @@ import projects                                          # noqa: E402
 
 app = FastAPI(title="Foreman API", version="2.0")
 
+# Same-origin in production (FastAPI serves the built SPA), so this list only
+# matters for the split dev setup — and for anyone pointing a hosted frontend
+# at this API. Never hardcoded again: ALLOWED_ORIGINS is comma-separated.
+_ORIGINS = [
+    o.strip() for o in
+    os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_ORIGINS,
     allow_methods=["*"], allow_headers=["*"],
 )
 
 
 def _load_active_into_neo4j(retries: int = 8) -> None:
     """Push the active project into Neo4j (retry while Neo4j warms up)."""
+    if not neo4j_enabled():
+        print("[startup] no NEO4J_URI — running on the JSON mirror")
+        return
     for i in range(retries):
         try:
-            load_to_neo4j(projects.get_active_project())
+            load_to_neo4j_if_enabled(projects.get_active_project())
             return
         except Exception as e:
             if i == retries - 1:
@@ -246,7 +261,23 @@ def cost_of_waiting(req: dict):
 
 @app.post("/api/ask")
 def ask(req: AskReq):
-    return _jsonable(brain_answer(req.question, req.scene))
+    """Ask Foreman is the one surface that needs the LLM. A public deployment
+    can lose it (key unset, free-tier quota spent) — when that happens say so
+    in one sentence instead of returning a stack trace. Every other surface,
+    including the whole cascade/money/recovery number path, is LLM-free and
+    keeps working."""
+    from agents.llm import has_key                           # noqa: PLC0415
+    if not has_key():
+        raise HTTPException(503, "Ask Foreman needs a Gemini key on the server. "
+                                 "The cascade, risk radar, money and recovery "
+                                 "views don't use an LLM and are unaffected.")
+    try:
+        return _jsonable(brain_answer(req.question, req.scene))
+    except Exception as e:
+        first = str(e).split("\n")[0][:160]
+        raise HTTPException(503, f"The reasoning agent could not finish that "
+                                 f"question ({first}). The graph, cascade and "
+                                 f"money views are unaffected.")
 
 
 @app.post("/api/build-graph")
@@ -295,7 +326,7 @@ def projects_create(data: dict):
         pid = projects.create_project(data)
     except (KeyError, ValueError) as e:
         raise HTTPException(400, f"Invalid project: {e}")
-    load_to_neo4j(projects.get_active_project())
+    load_to_neo4j_if_enabled(projects.get_active_project())
     return {"id": pid, "active": pid}
 
 
@@ -339,7 +370,7 @@ def projects_activate(pid: str):
         projects.set_active(pid)
     except ValueError as e:
         raise HTTPException(404, str(e))
-    load_to_neo4j(projects.get_active_project())
+    load_to_neo4j_if_enabled(projects.get_active_project())
     return {"active": pid}
 
 
@@ -349,5 +380,28 @@ def projects_delete(pid: str):
         projects.delete_project(pid)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    load_to_neo4j(projects.get_active_project())
+    load_to_neo4j_if_enabled(projects.get_active_project())
     return {"active": projects.get_active_id()}
+
+
+# ------------------------------------------------------- static SPA (prod)
+# In production Foreman is ONE service: this API also serves the built React
+# app. Same origin means no CORS, no API base URL to configure, and one URL to
+# hand a judge. Mounted last so every /api route above wins the match first.
+_DIST = Path(__file__).resolve().parents[1] / "web" / "dist"
+
+if _DIST.is_dir():
+    app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str):
+        """Serve real files; hand everything else to the client-side router."""
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "no such endpoint")
+        candidate = (_DIST / full_path).resolve()
+        # resolve() + is_relative_to keeps ../ out of the served tree
+        if full_path and candidate.is_file() and candidate.is_relative_to(_DIST):
+            return FileResponse(candidate)
+        return FileResponse(_DIST / "index.html")
+else:
+    print("[startup] web/dist not built — API-only mode (dev uses the Vite proxy)")

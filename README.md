@@ -85,6 +85,42 @@ cd web && npm install && cd ..
 Then open **http://localhost:5173**. (The legacy Streamlit prototype still runs via
 `./.venv/bin/streamlit run app.py` if needed.)
 
+## Deploy it
+
+In production Foreman is **one service**: FastAPI serves the built React app from
+the same origin, so there is no CORS to configure and no API base URL to point
+anywhere. One image, one URL.
+
+```bash
+docker build -t foreman .
+docker run -p 8000:8000 -e GEMINI_API_KEY=... foreman
+```
+
+Open **http://localhost:8000**. On Render, `render.yaml` deploys this as-is —
+set `GEMINI_API_KEY` in the dashboard.
+
+**Environment variables** — all optional except the key:
+
+| Variable | Effect if unset |
+|---|---|
+| `GEMINI_API_KEY` | Ask Foreman returns a clear 503; every other view still works |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Runs on the JSON mirror instead of Neo4j |
+| `ALLOWED_ORIGINS` | Defaults to the local Vite dev origins (unused when same-origin) |
+| `PORT` | Defaults to 8000 |
+
+### Running without Neo4j
+
+`src/db.py` keeps a NetworkX mirror of the graph built from the same project
+JSON, and `tests/test_mirror.py` asserts the two produce **identical** cascade
+and risk-radar results. So the app stays up if the graph database is
+unreachable — the CPM cascade, risk radar, Monte-Carlo, money and recovery
+layers never touch Neo4j or an LLM at all.
+
+The one surface that genuinely needs Neo4j is **Ask Foreman**, which writes
+real Cypher against the graph. Without it, Ask answers "I couldn't find that";
+add the three `NEO4J_*` variables (e.g. a Neo4j Aura instance) and it works
+with no code change.
+
 ## Tech stack
 
 **Frontend:** React + TypeScript + Vite · Tailwind · Framer Motion · React Flow
