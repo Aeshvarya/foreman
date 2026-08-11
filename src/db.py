@@ -53,18 +53,31 @@ def neo4j_enabled() -> bool:
     return bool(NEO4J_URI)
 
 
+_DRIVER = None
+
+
 def _driver():
+    """One long-lived driver for the process, sessions per call.
+
+    A driver owns a connection pool and is designed to outlive requests — the
+    old build made a fresh one per call, which on a hosted graph (Aura) means
+    paying a TLS handshake on every endpoint that touches the graph, and
+    `get_graph()` runs on nearly all of them.
+    """
+    global _DRIVER
     if not neo4j_enabled():
         raise Neo4jUnavailable("NEO4J_URI is not set")
-    from neo4j import GraphDatabase
-    return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    if _DRIVER is None:
+        from neo4j import GraphDatabase
+        _DRIVER = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    return _DRIVER
 
 
 # --------------------------------------------------------------------- load
 def load_to_neo4j(project: dict | None = None) -> dict:
     """Wipe and repopulate Neo4j from the project dict. Returns counts."""
     project = project or load_project()
-    with _driver() as drv, drv.session() as s:
+    with _driver().session() as s:
         s.run("MATCH (n) DETACH DELETE n")
 
         # Project meta node (carries handover milestone for the graph mirror).
@@ -116,7 +129,7 @@ def graph_from_neo4j() -> nx.DiGraph:
     Node ids + attributes and edge kinds match `graph.build_graph` so the CPM
     engine consumes it identically.
     """
-    with _driver() as drv, drv.session() as s:
+    with _driver().session() as s:
         meta = s.run(
             "MATCH (p:Project) RETURN p.name AS name, p.handover AS handover"
         ).single()
@@ -189,7 +202,7 @@ The handover milestone is the Activity whose id == (:Project).handover.
 
 def run_cypher(query: str, params: dict | None = None) -> list[dict]:
     """Execute read Cypher, return rows as dicts (used by the query agent)."""
-    with _driver() as drv, drv.session() as s:
+    with _driver().session() as s:
         return [r.data() for r in s.run(query, params or {})]
 
 
@@ -198,12 +211,12 @@ def update_material(mat_id: str, props: dict) -> None:
     Material node. Used by the KG Builder to keep status current from docs."""
     if not neo4j_enabled():
         return                       # no mirror to update; caller keeps the JSON
-    with _driver() as drv, drv.session() as s:
+    with _driver().session() as s:
         s.run("MATCH (m:Material {id:$id}) SET m += $props", id=mat_id, props=props)
 
 
 def verify(silent: bool = False) -> dict:
-    with _driver() as drv, drv.session() as s:
+    with _driver().session() as s:
         counts = {
             "suppliers": s.run("MATCH (n:Supplier) RETURN count(n) AS c").single()["c"],
             "materials": s.run("MATCH (n:Material) RETURN count(n) AS c").single()["c"],
