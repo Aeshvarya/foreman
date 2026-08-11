@@ -66,7 +66,7 @@ export default function Landing() {
             <Button href="#brain" variant="ghost">See what it does</Button>
           </div>
           <div className="mt-12 flex flex-wrap gap-x-8 gap-y-3">
-            {[["~79%", "avg megaproject overrun"], ["3,000", "futures simulated"], ["100%", "grounded in CPM math"]].map(
+            {[["77%", "run at least 40% late"], ["3,000", "futures simulated"], ["100%", "grounded in CPM math"]].map(
               ([v, l]) => (
                 <div key={l}>
                   <div className="font-display text-2xl font-bold text-amber">{v}</div>
