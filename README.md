@@ -1,148 +1,316 @@
 <p align="center">
-  <img src="assets/foreman-logo.png" alt="Foreman logo" width="140">
+  <img src="assets/foreman-logo.png" alt="Foreman logo" width="120">
 </p>
 
 <h1 align="center">Foreman</h1>
 
-**The reasoning brain for construction supply chains.**
+<p align="center"><strong>The reasoning brain for construction supply chains.</strong></p>
 
-Everyone predicts *if* a material is late. Foreman predicts **what it breaks** — which downstream activities slip, whether the handover date survives, how confident it is, and what to do about it — in plain English, over a knowledge graph it builds itself from your project documents.
+<p align="center">
+  Everyone predicts <em>if</em> a material is late.<br>
+  Foreman predicts <strong>what it breaks</strong> — which jobs slip, whether the handover date survives,<br>
+  how sure it is, and what the cheapest fix costs.
+</p>
 
-> Kaya AI IIT India Hackathon 2026 · **Team Gozers** (Aeshvarya Awasthi + Varunika Rai, IIT Jodhpur) · Track: **Supply Chain** · **Stage 2**
+<p align="center">
+  <a href="https://foreman-yi3t.onrender.com"><img alt="Live demo" src="https://img.shields.io/badge/live%20demo-foreman--yi3t.onrender.com-F5A524?style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
+  <img alt="Neo4j" src="https://img.shields.io/badge/Neo4j-Cypher-4581C3?logo=neo4j&logoColor=white">
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-agents-1C3C3C">
+  <img alt="Gemini" src="https://img.shields.io/badge/Gemini-Flash-8E75B2?logo=googlegemini&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React%2019-TypeScript-61DAFB?logo=react&logoColor=black">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white">
+</p>
+
+<p align="center">
+  <sub>Kaya AI IIT India Hackathon 2026 · <strong>Team Gozers</strong> · Track: <strong>Supply Chain</strong> · Round 2</sub>
+</p>
+
+<p align="center">
+  <a href="https://foreman-yi3t.onrender.com">
+    <img src="screenshots/01-landing.jpg" alt="Foreman — the reasoning brain for construction supply chains" width="100%">
+  </a>
+</p>
+
+---
+
+## The 15 seconds that explain the whole project
+
+Same engine. Same project. Same question — *"this is running late, what happens?"*
+**Opposite answers.**
+
+| Structural steel slips 5 days | Switchgear slips 7 days |
+|---|---|
+| ![Handover breaks by 2 days](screenshots/03-cascade-steel-breaks.jpg) | ![Handover holds, float absorbs it](screenshots/04-cascade-switchgear-absorbed.jpg) |
+| 🔴 **Handover breaks — +2 days.** Steel is on the critical path, so the slip travels all the way to the handover date. | 🟢 **Handover holds — float absorbs it.** The switchgear has slack. Nothing downstream moves. |
+
+A tracker panics at both. **Foreman knows which one matters** — because it runs real Critical-Path-Method math, not a heuristic. That second screenshot is the important one: anyone can build something that shouts. Staying quiet when the schedule genuinely absorbs a hit is what proves the engine is real.
 
 ---
 
 ## The problem
 
-On mission-critical builds like data centers, the moment materials are ordered, visibility collapses: What's approved? What's being fabricated? What's delayed? Will it arrive by its **ROJ (Required-On-Job) date**? Answers live in emails, calls and disconnected systems — so slippage is caught **too late**, and one late item cascades: late steel blocks concrete, which blocks MEP, which moves the handover. Megaprojects average **~79% cost overruns**, with material slippage a leading driver.
+**77% of megaprojects run at least 40% late.** On mission-critical builds like data centers, the moment materials are ordered, visibility collapses: What's approved? What's being fabricated? Where is it? Will it arrive by its **ROJ (Required-On-Job)** date?
 
-A delay-prediction dashboard is a warning light. It can't tell you *why*, *what else breaks*, or *how sure it is*. **Foreman is not a dashboard — it's a reasoning brain.**
+Those answers live in inboxes, phone calls, and disconnected systems — so slippage gets caught too late. And delays don't stay put: late steel blocks concrete, which blocks MEP, which moves the handover, which triggers liquidated damages.
 
-## What Foreman does
+This is worse in 2026 than it has ever been. Real market lead times right now:
 
-Foreman fuses three ideas nobody has assembled for construction: **uncertainty-aware agentic knowledge-graph construction**, **NL→graph reasoning**, and **CPM-grounded delay-cascade reasoning** — every number grounded in real schedule math, never hallucinated.
+| Item | 2026 lead time | Context |
+|---|---|---|
+| MV switchgear (15kV) | **52–80 weeks** | Effectively sold out through 2028 in many channels |
+| Generators | **20 → 60 weeks** | Cummins sold out of high-HP gensets through 2028 |
+| Substation transformers | **140 → 160+ weeks** | Largest HV units approaching 4 years |
 
-### 1. It builds its own brain from raw documents — `src/agents/kg_builder.py`
-Feed it the messy documents a real project generates (POs, supplier emails, GPS feeds, goods-received notes, submittal logs). It extracts source-tagged facts, scores each by how trustworthy the source is (site GRN 99% > GPS 95% > supplier email 90% > verbal 75% > inferred queue 60%), and **resolves conflicts by source weight**. On the demo corpus it catches that the switchgear supplier's email ("arrives Aug 20") conflicts with the factory-queue model ("Aug 24"), keeps the higher-weight source, drops confidence to **72%**, and flags it for human check. *Auditable intelligence, not a black box.* (Helicase-style, arXiv 2605.26835.)
+A delay-prediction dashboard is a warning light. It cannot tell you *why*, *what else breaks*, or *how sure it is*.
 
-### 2. Ask it anything, in English — `src/agents/query_agent.py`
-A LangGraph agent classifies the question, writes read-only **Cypher** against Neo4j, self-corrects on error, and answers with citations — showing every step of its reasoning. *"If the diesel generators are delayed, what activities are affected?"* → it traverses the graph and names ACT-7, 8, 11, 12. (KG+LLM iterative reasoning, arXiv 2507.17273.)
+> **Foreman is not a dashboard. It's a reasoning brain.**
 
-### 3. The cascade engine — the star — `src/cascade.py` + `src/agents/cascade_agent.py`
-A real Critical-Path-Method forward pass honoring both the dependency network *and* material arrival constraints. Ask *"the switchgear slips 5 days — what breaks?"* and it computes which activities slip and by how much, which **absorb** the hit through float, whether the **handover breaks**, and the cheapest mitigation. The LLM only narrates the numbers the CPM engine computes — so it can never invent a schedule impact.
+---
 
-| Scenario | Foreman's verdict |
-|---|---|
-| Structural steel +5d (critical path) | 🔴 handover breaks +2d |
-| Switchgear +12d | 🟢 float absorbs it — don't panic |
-| Generators +14d (60% confidence, submittal stuck) | 🔴 breaks +7d — *the silent killer* |
+## What it actually does
 
-That contrast **is** the intelligence: a dumb tracker panics at every delay; Foreman knows which delays matter.
+### 🌅 Opens on what needs you — not on an empty simulator
 
-### 4. Probabilistic risk, not point estimates — `src/montecarlo.py`
-Models each material's arrival as a distribution whose spread scales with our *uncertainty* about it, then runs 3,000 futures through the CPM engine: **14% probability the handover slips, driven almost entirely by the low-confidence diesel generators.** (Bayesian–Monte-Carlo schedule updating, arXiv 2605.17608.)
+![Today](screenshots/02-today.jpg)
 
-### 5. Who else can supply it — `src/alt_supplier.py`
-When a material threatens the handover, Foreman embeds candidate suppliers as capability vectors (reliability, speed, region) and ranks market alternates — checking each lead time against days-to-ROJ. It knows a full re-order is too slow this late and surfaces the realistic move: a **rental bridge that still meets the deadline**. (Supply-network link-prediction line, Kosasih & Brintrup.)
+Most tools hand you a blank canvas and expect you to know what to ask. Foreman opens already knowing: it reads the whole graph, ranks what's worth your attention, prices what's at risk, and says it in the language a site manager actually uses — *"8 days of room before the handover date moves"*, not *"float = 8"*.
 
-### 6. Proactive risk radar — `src/risk.py`
-Binary-searches the cascade engine for each material's **breaking point** (minimum slip that kills the handover), crosses it with confidence, and ranks the silent killers so you chase the right vendor today.
+Note the headline: **"Nothing urgent — 5 worth a check."** It is willing to tell you there's no fire.
+
+### ⚡ The cascade engine — the star
+
+A true CPM forward pass honoring both the dependency network **and** material arrival constraints. Say something slips and it computes which activities move, which absorb it through float, whether the handover breaks, and by how much.
+
+**The LLM never touches the number path.** It narrates what the CPM engine computed; it cannot invent a date. That is a deliberate design decision, and it's what makes the math auditable.
+
+### 🎯 Risk radar — the silent killers
+
+![Risk radar](screenshots/05-risk-radar.jpg)
+
+For every material, Foreman binary-searches the cascade engine for its **breaking point** — the exact number of days it can slip before the handover moves — then crosses that with how much we actually trust the data.
+
+That ranking is the insight. The switchgear can slip **16 days**; the generators only **8** — and the generators' status is *"a guess"* (submittal still under review, so fabrication can't start and the arrival is inferred). The quiet, unconfirmed item outranks the loud one. A Monte-Carlo over 3,000 futures agrees: **14% chance the handover slips**, driven almost entirely by those generators.
+
+### 💬 Ask it in English — and watch it reason
+
+![Ask Foreman reasoning trail](screenshots/06-ask-reasoning.jpg)
+
+A LangGraph agent classifies the question, writes read-only **Cypher** against Neo4j, self-corrects on failure, and answers with citations back to real graph nodes.
+
+When a question is too big to answer in one hop, it **breaks it into sub-questions**, gathers evidence for each, drafts an answer, then **checks its own answer against the evidence** and fetches whatever is missing before answering again (bounded at 3+1 rounds). The screenshot above shows exactly that: *3 graph queries · 2 follow-up questions · self-checked*.
+
+**The critical constraint: reflection can only ever ADD graph evidence. It can never invent.** Every step is shown in plain English, with a toggle for the raw Cypher — so a site manager reads sentences and an engineer inspects the query.
+
+### 📄 It builds its own brain from raw documents
+
+![Build from docs](screenshots/07-build-from-docs.jpg)
+
+Feed it the mess a real project generates — POs, supplier emails, GPS pings, goods-received notes, submittal logs. It extracts source-tagged facts and scores each by how much that *kind* of source deserves to be trusted:
+
+```
+site GRN 99%  >  GPS ping 95%  >  supplier email 90%  >  verbal 75%  >  inferred queue 60%
+```
+
+When sources disagree it **resolves by source weight and lowers confidence**. On the demo corpus it catches that the switchgear supplier's email ("arrives Aug 20") conflicts with the factory-queue model ("Aug 24"), keeps the stronger source, drops confidence to **72%**, and flags it for a human. Auditable intelligence, not a black box.
+
+### 💰 Every delay priced, every fix ranked in rupees
+
+This is the layer no comparable project has at all. Foreman doesn't stop at *"the handover breaks"* — it tells you what that costs and what to do:
+
+**Generators 14 days late → 7-day handover slip → ₹23.45 lakh exposed** (₹3.35 lakh/day)
+
+| Fix | Buys | Costs | Keeps |
+|---|---|---|---|
+| Rent from PowerHire instead | **7 days** | ₹4 lakh | **₹19.45 lakh** |
+| Pay to expedite fabrication | 7 days | ₹4.80 lakh | ₹18.65 lakh |
+| Extra shifts on generator hookup | 2 days | ₹2.40 lakh | ₹4.30 lakh |
+
+The **"buys N days"** figure is not asserted — it is **measured by re-running the cascade** with that fix applied and diffing the handover date. And the cost-of-waiting engine shows the same fix getting more expensive every week you don't act, until the cheap option physically disappears.
+
+---
 
 ## Architecture
 
-```
-   React + TypeScript dashboard (web/)  :5173
-   cascade · radar · Ask Foreman · Build-from-Docs · New Project
-                        │  fetch /api/*
-   FastAPI (backend/main.py)            :8000
-                        │
-   KG Builder ───────► Query agent ───────► Cascade agent   (LangGraph + Gemini)
-   (docs→facts,        (NL→Cypher,          (CPM + Monte-Carlo
-    confidence,         self-correct,        + NL narration)
-    conflicts)          citations)
-        │                    │                     │
-        └──────────────► Neo4j (Docker) ◄──────────┘
-                             │
-             NetworkX mirror (src/db.py) → deterministic CPM math
+```mermaid
+flowchart TB
+    subgraph UI["React 19 + TypeScript (web/)"]
+        T[Today] ~~~ C[Cascade Simulator] ~~~ R[Risk Radar] ~~~ A[Ask Foreman] ~~~ B[Build from Docs]
+    end
+
+    UI -->|"same-origin /api/*"| API["FastAPI — backend/main.py"]
+
+    subgraph AG["Agent layer — LangGraph + Gemini Flash"]
+        KG["KG Builder<br/>docs → facts → confidence"] ~~~ QA["Query agent<br/>NL → Cypher → cite"] ~~~ CA["Cascade agent<br/>narrates CPM output"]
+    end
+
+    subgraph DET["Deterministic core — no LLM, ever"]
+        CPM["CPM cascade<br/>cascade.py"] ~~~ RISK["Breaking point<br/>risk.py"] ~~~ MC["Monte-Carlo ×3000<br/>montecarlo.py"] ~~~ MONEY["Money + recovery<br/>money.py · recovery.py"]
+    end
+
+    API --> AG
+    API --> DET
+    KG --> NEO[("Neo4j / Aura<br/>knowledge graph")]
+    QA --> NEO
+    NEO -->|"mirror"| NX["NetworkX graph<br/>src/db.py"]
+    NX --> DET
+    NEO -.->|"unreachable → JSON fallback"| NX
 ```
 
-Neo4j is the source of truth and the surface the query agent targets; a NetworkX mirror rebuilt from it runs the proven CPM cascade unchanged. `tests/test_mirror.py` proves the two produce identical results.
+Two things worth calling out:
 
-## Run it
+**1. The number path has no LLM in it.** Cascade, risk, Monte-Carlo, money and recovery are pure Python over a NetworkX graph. The LLM writes Cypher and explains results. It never produces a date or a rupee figure. Ask *"isn't this just a wrapper around an LLM?"* and the answer is in the call graph.
+
+**2. Neo4j is a mirror, not a single point of failure.** The graph is rebuilt into NetworkX for the CPM engine, and `tests/test_mirror.py` asserts both produce **identical** cascade and risk output. If the graph database is unreachable, the app keeps answering from the mirror — only Ask Foreman degrades.
+
+---
+
+## Verified numbers
+
+Everything below is reproducible against the live deployment, not screenshots of a mock.
+
+| Check | Result |
+|---|---|
+| Structural steel +5d | Handover breaks **+2 days**, confidence 0.92 |
+| Switchgear +15d | **Absorbed** — 0 days, confidence 0.70 |
+| Generators +14d | 7-day slip, **₹23.45 lakh** exposure |
+| Monte-Carlo (3,000 runs) | **14%** chance of handover slip |
+| Graph | 6 suppliers · 8 materials · 12 activities · 29 relationships |
+| Neo4j ↔ JSON parity | Identical across 8 materials × 3 delays |
 
 ```bash
-# 1. Python env + Gemini key (free — https://aistudio.google.com/apikey)
+curl -s https://foreman-yi3t.onrender.com/api/health
+# {"ok":true,"graph":"neo4j","graph_detail":"26 nodes","llm":true}
+
+curl -s -X POST https://foreman-yi3t.onrender.com/api/cascade \
+  -H 'Content-Type: application/json' -d '{"material_id":"MAT-1","delay_days":5}'
+```
+
+---
+
+## Run it locally
+
+```bash
+# 1. Python env + a free Gemini key — https://aistudio.google.com/apikey
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
-cp .env.example .env    # paste your key into GEMINI_API_KEY
+cp .env.example .env          # paste your key into GEMINI_API_KEY
 
 # 2. Frontend deps
 cd web && npm install && cd ..
 
-# 3. Start everything (Neo4j + API :8000 + web :5173)
+# 3. Neo4j (Docker) + API :8000 + web :5173
 ./dev.sh
 ```
 
-Then open **http://localhost:5173**. (The legacy Streamlit prototype still runs via
-`./.venv/bin/streamlit run app.py` if needed.)
+Open **http://localhost:5173**.
 
 ## Deploy it
 
-In production Foreman is **one service**: FastAPI serves the built React app from
-the same origin, so there is no CORS to configure and no API base URL to point
-anywhere. One image, one URL.
+In production Foreman is **one service**: FastAPI serves the built React app from the same origin. No CORS, no API base URL to configure, one container, one URL.
 
 ```bash
 docker build -t foreman .
 docker run -p 8000:8000 -e GEMINI_API_KEY=... foreman
 ```
 
-Open **http://localhost:8000**. On Render, `render.yaml` deploys this as-is —
-set `GEMINI_API_KEY` in the dashboard.
+On Render, `render.yaml` deploys this as-is — set `GEMINI_API_KEY` in the dashboard.
 
-**Environment variables** — all optional except the key:
+### Environment variables
 
-| Variable | Effect if unset |
+| Variable | Required | Effect if unset |
+|---|---|---|
+| `GEMINI_API_KEY` | for Ask only | Ask returns a clear 503; **everything else still works** |
+| `NEO4J_URI` | no | Runs on the JSON mirror instead of Neo4j |
+| `NEO4J_USER` / `NEO4J_USERNAME` | no | Defaults to `neo4j` |
+| `NEO4J_PASSWORD` | no | — |
+| `NEO4J_DATABASE` | no | Server default database |
+| `ALLOWED_ORIGINS` | no | Local Vite dev origins (unused when same-origin) |
+| `PORT` | no | `8000` |
+
+> **Connecting Neo4j Aura:** Aura names **both the user and the database after the instance id**, not `neo4j` — connecting with the documented defaults fails with `Unauthorized`, then `DatabaseNotFound`. Foreman reads `NEO4J_USER` *or* `NEO4J_USERNAME` and an optional `NEO4J_DATABASE`, so the credentials file Aura gives you can be pasted in unchanged.
+
+### Degrading gracefully
+
+`/api/health` reports what the instance is actually running on, because a degraded deployment looks identical from outside — the pages render, the answers are just worse:
+
+```json
+{"ok": true, "graph": "neo4j", "graph_detail": "26 nodes", "llm": true}
+```
+
+## Tests
+
+```bash
+./.venv/bin/python tests/test_mirror.py   # Neo4j ↔ NetworkX parity (needs Neo4j up)
+./.venv/bin/python tests/test_money.py    # money + recovery invariants
+```
+
+`test_mirror.py` is the one that matters: it proves swapping NetworkX for Neo4j changed nothing the CPM engine can see. `test_money.py` asserts recovery options never claim days they cannot deliver.
+
+## Repo map
+
+```
+backend/main.py       FastAPI — 26 endpoints + static SPA serving
+src/
+  cascade.py          CPM forward pass — the core engine
+  risk.py             breaking-point binary search
+  montecarlo.py       3,000-future simulation
+  money.py            exposure, penalties, commercials
+  recovery.py         ranked fixes, "buys N days" by re-simulation
+  timemachine.py      cost of waiting, week by week
+  today.py            the morning brief
+  db.py               Neo4j store + NetworkX mirror + JSON fallback
+  graph.py            graph construction, node/edge kinds
+  projects.py         multi-project storage, auto-seeding
+  alt_supplier.py     alternate-supplier ranking
+  comms.py            drafted supplier/client messages
+  agents/
+    kg_builder.py     documents → facts → confidence → conflict resolution
+    query_agent.py    NL → Cypher → self-correction → citations
+    brain.py          sub-questions + self-reflection loop
+    cascade_agent.py  narrates CPM output in plain English
+    project_builder.py  a sentence or a spreadsheet → a project
+    llm.py            Gemini wrapper, caching, key handling
+web/src/              React 19 dashboard, React Flow graph, Framer Motion
+data/project.json     Sunrise DC-1 — synthetic 12MW data center
+docs/ARCHITECTURE.md  deeper engineering write-up
+docs/JUDGE-QA.md      the hard questions, answered honestly
+```
+
+## Honest limitations
+
+Written by us, not extracted under questioning:
+
+- **The project is synthetic.** Sunrise DC-1 is invented and labelled as such *inside the app*, on every screen. The **market lead times behind it are real 2026 figures**. We asked Kaya for a live data feed on 24 July; access wasn't granted before the deadline.
+- **Confidence scores are calibrated by source type, not learned.** A GRN outranks a verbal update because that ordering is defensible, not because a model fit it to outcome data. With real project history this becomes a learning problem.
+- **The alternate-supplier ranking is a capability-vector heuristic**, not the trained GNN the research line points toward.
+- **Aura Free auto-pauses after 3 days idle**, and the free Render instance sleeps after 15 minutes. Cold start is ~30s. If the graph database is asleep, the app falls back to the JSON mirror and only Ask degrades.
+
+## Research grounding
+
+| Component | Line of work |
 |---|---|
-| `GEMINI_API_KEY` | Ask Foreman returns a clear 503; every other view still works |
-| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Runs on the JSON mirror instead of Neo4j |
-| `ALLOWED_ORIGINS` | Defaults to the local Vite dev origins (unused when same-origin) |
-| `PORT` | Defaults to 8000 |
-
-### Running without Neo4j
-
-`src/db.py` keeps a NetworkX mirror of the graph built from the same project
-JSON, and `tests/test_mirror.py` asserts the two produce **identical** cascade
-and risk-radar results. So the app stays up if the graph database is
-unreachable — the CPM cascade, risk radar, Monte-Carlo, money and recovery
-layers never touch Neo4j or an LLM at all.
-
-The one surface that genuinely needs Neo4j is **Ask Foreman**, which writes
-real Cypher against the graph. Without it, Ask answers "I couldn't find that";
-add the three `NEO4J_*` variables (e.g. a Neo4j Aura instance) and it works
-with no code change.
-
-## Tech stack
-
-**Frontend:** React + TypeScript + Vite · Tailwind · Framer Motion · React Flow
-**Backend:** Python · **FastAPI** · **Neo4j** (Cypher) · **LangGraph** · **Gemini**
-(via langchain-google-genai) · NetworkX (CPM) · NumPy (Monte-Carlo) · Docker
-
-## Your own projects — no JSON
-
-Open the dashboard → **New Project** (or the project switcher in the sidebar) to build a
-project from a guided form: suppliers, materials (supplier + dates + confidence), and a
-schedule where each activity picks the materials it needs and the activities it depends on.
-Hit **Create & launch** and the whole app — graph, cascade, risk radar, chat — runs on it.
-Switch between projects any time. Projects are stored under `data/projects/`.
-
-## Demo data
-
-`data/project.json` — **Sunrise DC-1**, a synthetic 12MW data-center build (8 materials, 6 suppliers, 12 activities → handover), auto-seeded as the first project. `data/docs/` — the raw document corpus the KG Builder ingests. `data/market_suppliers.json` — the alternate-supplier catalog. All synthetic, modeled on real construction supply-chain structures.
+| Uncertainty-aware agentic KG construction | Helicase-style extraction (arXiv 2605.26835) |
+| Iterative KG + LLM reasoning | Sub-question decomposition (arXiv 2507.17273) |
+| Bayesian–Monte-Carlo schedule updating | arXiv 2605.17608 |
+| Supply-network link prediction | Kosasih & Brintrup |
 
 ## How it extends Kaya
 
-Kaya's Amber unifies submittal → delivery into a project graph. Foreman is the **reasoning layer on top**: it takes that visibility and answers the question a director actually asks — *what breaks if this is late, how sure are we, and how do we save the date?*
+Kaya's **Amber** unifies submittal → delivery into a project graph: it manages procurement, tracks equipment, coordinates deliveries. That is the **doing**.
+
+Foreman is the reasoning layer on top — the **knowing**. It answers the question a project director actually asks:
+
+> *If this slips, what breaks, how sure are we, and what's the cheapest fix?*
+
+**Amber does the doing. Foreman does the knowing.**
 
 ---
 
-**Team Gozers** — Aeshvarya Awasthi · Varunika Rai · IIT Jodhpur
+<p align="center">
+  <strong>Team Gozers</strong> — Aeshvarya Awasthi · Varunika Rai · IIT Jodhpur<br>
+  <sub><a href="https://foreman-yi3t.onrender.com">Live demo</a> · <a href="docs/ARCHITECTURE.md">Architecture</a> · <a href="docs/JUDGE-QA.md">Judge Q&A</a></sub>
+</p>
