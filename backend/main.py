@@ -122,7 +122,23 @@ class AskReq(BaseModel):
 # ------------------------------------------------------------------ routes
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    """Liveness plus what the instance is actually running on.
+
+    A deployment degrades quietly — same pages, worse answers — so the health
+    check reports which graph store answered and whether the LLM is reachable.
+    No secrets: booleans and a store name, never a URI or a key.
+    """
+    from agents.llm import has_key                           # noqa: PLC0415
+    graph, detail = "json", "no NEO4J_URI configured"
+    if neo4j_enabled():
+        try:
+            from db import graph_from_neo4j                  # noqa: PLC0415
+            g = graph_from_neo4j()
+            graph, detail = "neo4j", f"{g.number_of_nodes()} nodes"
+        except Exception as e:
+            detail = f"neo4j configured but unreachable: {str(e).splitlines()[0][:120]}"
+    return {"ok": True, "graph": graph, "graph_detail": detail,
+            "llm": has_key()}
 
 
 @app.get("/api/project")
