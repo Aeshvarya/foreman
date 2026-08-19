@@ -1,0 +1,28 @@
+# Keeps the free-tier deployment awake.
+#
+# Render free web services spin down after 15 minutes idle and take ~33s to
+# wake, and Neo4j Aura Free auto-pauses after a few days of inactivity. A judge
+# clicking the demo link should not be the request that pays for either.
+#
+# /api/health is the right target: it reports which graph store answered, so
+# hitting it also keeps the Aura instance from going dormant.
+name: keep-warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 90 \
+              https://foreman-yi3t.onrender.com/api/health) && break
+            echo "attempt $attempt failed, retrying"; sleep 15
+          done
+          echo "HTTP $code"; cat /tmp/health.json; echo
+          test "$code" = "200"
