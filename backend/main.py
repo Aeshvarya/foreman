@@ -58,6 +58,19 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def _currency_middleware(request, call_next):
+    """Pick the display currency for this request from the X-Currency header.
+
+    The engine always computes in INR; only the formatting layer cares. Keeping
+    the choice per-request (a ContextVar, not a global) means two people can
+    have the same deployment open in different currencies without fighting.
+    Absent or unrecognised header -> USD, which is the product default.
+    """
+    money.set_currency(request.headers.get("X-Currency"))
+    return await call_next(request)
+
+
 def _load_active_into_neo4j(retries: int = 8) -> None:
     """Push the active project into Neo4j (retry while Neo4j warms up)."""
     if not neo4j_enabled():
@@ -225,9 +238,19 @@ def today():
 
 
 # ---------------------------------------------------------------- money
+@app.get("/api/currency")
+def currency_info():
+    """Which currency this request was served in, and at what rate.
+
+    The UI prints this verbatim under any converted figure so the conversion is
+    auditable on screen rather than taken on trust.
+    """
+    return money.rate_info()
+
+
 @app.get("/api/money")
 def money_settings():
-    """The rupee assumptions behind every cost shown in the UI, each labelled
+    """The cost assumptions behind every number shown in the UI, each labelled
     'your number' or 'assumed' with the reasoning behind the default."""
     return money.commercials(projects.get_active_project())
 

@@ -37,7 +37,7 @@ from alt_supplier import recommend                       # noqa: E402
 from cascade import run_cascade_multi                    # noqa: E402
 from db import get_graph                                 # noqa: E402
 from graph import ACTIVITY, MATERIAL                     # noqa: E402
-from money import cost_of_delay, fmt_inr, values         # noqa: E402
+from money import cost_of_delay, fmt_money, values         # noqa: E402
 from recovery import (                                   # noqa: E402
     CRASH_CAP_DAYS, CRASH_FRACTION, EXPEDITE_CAP_DAYS, EXPEDITE_FRACTION, _short,
 )
@@ -84,8 +84,8 @@ def cost_of_waiting(material_id: str, delay_days: int = 7,
             "expected_arrival": arrives.isoformat(),
             "discovered_without_foreman": discovered_without_us.isoformat(),
             "warning_days": warning_days, "checkpoints": [],
-            "act_now_cost": 0, "act_now_label": fmt_inr(0),
-            "wait_cost": 0, "wait_label": fmt_inr(0),
+            "act_now_cost": 0, "act_now_label": fmt_money(0),
+            "wait_cost": 0, "wait_label": fmt_money(0),
             "options_expire": None,
             "headline": (f"Even {delay_days} days late, the schedule absorbs this. "
                          f"Nothing to spend and nothing to chase."),
@@ -205,7 +205,7 @@ def _best_option(g, material_id, delays, base_slip, as_of, needed_by,
     return {
         "option": best["title"], "kind": best["kind"],
         "cost": best["total_bill"],
-        "cost_label": fmt_inr(best["total_bill"]),
+        "cost_label": fmt_money(best["total_bill"]),
         "days_saved": best["days_saved"], "why": best["why"],
     }
 
@@ -255,7 +255,7 @@ def _headline(now, later, warning_days, exposure) -> str:
     if extra <= 0:
         return f"Fixing this costs {now['cost_label']} whenever you do it — but sooner is safer."
     return (f"Act today: {now['cost_label']}. Leave it {later['label'].replace('in ', '')}: "
-            f"{later['cost_label']} — {fmt_inr(extra)} more for waiting.")
+            f"{later['cost_label']} — {fmt_money(extra)} more for waiting.")
 
 
 if __name__ == "__main__":

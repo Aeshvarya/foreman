@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cascade import run_cascade_multi                 # noqa: E402
 from db import get_graph                              # noqa: E402
 from graph import MATERIAL                            # noqa: E402
-from money import cost_of_delay, fmt_inr              # noqa: E402
+from money import cost_of_delay, fmt_money              # noqa: E402
 from recovery import recovery_options                 # noqa: E402
 
 
@@ -150,7 +150,7 @@ def _one_pager(items, project_name, report, slip, exposure, plan) -> dict:
         "handover_was": str(report.baseline_handover),
         "handover_now": str(report.handover_date),
         "slip_days": slip,
-        "exposure_label": exposure["total_label"] if slip > 0 else fmt_inr(0),
+        "exposure_label": exposure["total_label"] if slip > 0 else fmt_money(0),
         "late": [{"name": i["name"], "supplier": i["supplier"], "days": i["days"],
                   "needed_by": i["needed_by"]} for i in items],
         "affected": [{"name": s["name"], "slip": s["slip_days"]} for s in report.slipped[:6]],

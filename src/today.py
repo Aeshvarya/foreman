@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cascade import run_cascade                 # noqa: E402
 from db import get_graph                        # noqa: E402
-from money import cost_of_delay, fmt_inr        # noqa: E402
+from money import cost_of_delay, fmt_money        # noqa: E402
 from risk import risk_radar                     # noqa: E402
 
 # The "what if this goes wrong" probe. A week is the unit a supplier delay
@@ -139,7 +139,7 @@ def brief(project: dict | None = None) -> dict:
         "tone": tone,
         "subhead": _subhead(tone, urgent, watch, worst),
         "at_stake": at_stake,
-        "at_stake_label": fmt_inr(at_stake),
+        "at_stake_label": fmt_money(at_stake),
         "counts": {"urgent": len(urgent), "watch": len(watch), "total": len(items)},
         "items": items,
     }

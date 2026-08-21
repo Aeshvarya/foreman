@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  IndianRupee, TrendingDown, Truck, Repeat, MoonStar, ChevronDown,
+  IndianRupee, DollarSign, TrendingDown, Truck, Repeat, MoonStar, ChevronDown,
   Sparkles, SlidersHorizontal, Info, Check,
 } from "lucide-react";
 import { api, type RecoveryPlan as Plan, type RecoveryOption, type MoneySettings } from "../lib/api";
 import { GlassCard, Kicker, Badge } from "./primitives";
 import { cn } from "../lib/cn";
+import { fmtShort, symbol, toInr, fromInr, currency, RATE_NOTE } from "../lib/currency";
+
+/** The currency mark, as an icon, so headline panels match the numbers
+ *  underneath them instead of showing a rupee sign over a dollar total. */
+const MoneyIcon = currency() === "USD" ? DollarSign : IndianRupee;
 
 /* What a delay costs, and the cheapest ways out of it.
  *
@@ -78,7 +83,7 @@ export default function RecoveryPlan({ delays }: { delays: Record<string, number
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 text-red">
-                  <IndianRupee size={18} />
+                  <MoneyIcon size={18} />
                   <span className="kicker !text-red/80">If nobody does anything</span>
                 </div>
                 <div className="mt-1 font-display text-3xl font-bold text-red">
@@ -224,7 +229,8 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
 
   async function save() {
     const patch: Record<string, number | null> = {};
-    for (const [k, v] of Object.entries(draft)) patch[k] = v.trim() === "" ? null : Number(v);
+    for (const [k, v] of Object.entries(draft))
+      patch[k] = v.trim() === "" ? null : toInr(Number(v));   // UI currency -> INR for the API
     try {
       const next = await api.saveMoney(patch);
       setSettings(next); setDraft({}); setError("");
@@ -238,8 +244,9 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
       exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
       <GlassCard className="p-5">
         <p className="mb-4 text-sm text-muted">
-          These are the rupee figures behind every number above. Put your real contract numbers in and
-          everything recalculates. Leave a box empty to go back to our assumption.
+          These are the figures behind every number above, in {currency()}. Put your real contract
+          numbers in and everything recalculates. Leave a box empty to go back to our assumption.
+          {currency() === "USD" && <span className="block pt-1 text-xs text-faint">{RATE_NOTE}</span>}
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {settings && Object.values(settings).map((s) => (
@@ -251,9 +258,9 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
               </label>
               <p className="mb-1.5 mt-0.5 text-xs text-faint">{s.plain}</p>
               <div className="flex items-center gap-2">
-                <span className="text-muted">₹</span>
-                <input inputMode="numeric" placeholder={String(s.value)}
-                  value={draft[s.key] ?? (s.source === "your number" ? String(s.value) : "")}
+                <span className="text-muted">{symbol()}</span>
+                <input inputMode="numeric" placeholder={String(fromInr(s.value))}
+                  value={draft[s.key] ?? (s.source === "your number" ? String(fromInr(s.value)) : "")}
                   onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })}
                   className="w-full rounded-lg border border-line bg-black/30 px-3 py-1.5 font-mono text-sm
                     outline-none focus:border-amber/50" />
@@ -276,11 +283,4 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
   );
 }
 
-/** Indian short form, mirroring the backend's fmt_inr for values the API
- *  hands over as raw numbers. */
-export function fmtShort(n: number): string {
-  const a = Math.abs(n), sign = n < 0 ? "-" : "";
-  if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(2).replace(/\.00$/, "")} crore`;
-  if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(2).replace(/\.00$/, "")} lakh`;
-  return `${sign}₹${Math.round(a).toLocaleString("en-IN")}`;
-}
+export { fmtShort };

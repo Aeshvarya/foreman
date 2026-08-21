@@ -29,7 +29,7 @@ from alt_supplier import recommend                      # noqa: E402
 from cascade import run_cascade_multi                   # noqa: E402
 from db import get_graph                                # noqa: E402
 from graph import ACTIVITY, MATERIAL                    # noqa: E402
-from money import cost_of_delay, fmt_inr, values        # noqa: E402
+from money import cost_of_delay, fmt_money, values        # noqa: E402
 
 # How much of a delay expediting can realistically claw back. You cannot
 # air-freight your way out of a 30-day fabrication slip — flying it in only
@@ -84,7 +84,7 @@ def recovery_options(delays: dict[str, int], project: dict | None = None) -> dic
         "cost_label": "—",
         "exposure_after": exposure["total"],
         "net": 0,
-        "net_label": fmt_inr(0),
+        "net_label": fmt_money(0),
         "feasible": True,
         "confidence": "certain",
         "how": [],
@@ -134,10 +134,10 @@ def _expedite_option(g, delays, mat_id, base_slip, per_day_cost, rates) -> list[
                   f"{'s' if pull != 1 else ''} sooner."),
         "days_saved": days_saved,
         "cost": cost,
-        "cost_label": fmt_inr(cost),
+        "cost_label": fmt_money(cost),
         "avoided": avoided,
         "net": net,
-        "net_label": fmt_inr(net),
+        "net_label": fmt_money(net),
         "feasible": True,
         "confidence": "high" if mat.get("confidence", 1) >= 0.8 else "medium",
         "how": [
@@ -194,10 +194,10 @@ def _switch_option(g, delays, mat_id, base_slip, per_day_cost, rates) -> list[di
                   f"{alt['reliability']:.0%} of the time."),
         "days_saved": days_saved,
         "cost": cost,
-        "cost_label": fmt_inr(cost),
+        "cost_label": fmt_money(cost),
         "avoided": avoided,
         "net": net,
-        "net_label": fmt_inr(net),
+        "net_label": fmt_money(net),
         "feasible": True,
         "confidence": "medium",
         "how": [
@@ -245,10 +245,10 @@ def _overtime_options(g, delays, base_slip, per_day_cost, rates) -> list[dict]:
                       f"{'s' if crash != 1 else ''} faster once it starts."),
             "days_saved": days_saved,
             "cost": cost,
-            "cost_label": fmt_inr(cost),
+            "cost_label": fmt_money(cost),
             "avoided": avoided,
             "net": net,
-            "net_label": fmt_inr(net),
+            "net_label": fmt_money(net),
             "feasible": True,
             "confidence": "medium",
             "how": [

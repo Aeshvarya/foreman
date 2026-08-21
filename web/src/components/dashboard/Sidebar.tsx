@@ -3,6 +3,7 @@ import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp, Sun } 
 import { Wordmark } from "../primitives";
 import ProjectSwitcher from "./ProjectSwitcher";
 import { cn } from "../../lib/cn";
+import { currency, setCurrency, RATE_NOTE } from "../../lib/currency";
 import { useTour } from "../../features/tour/TourProvider";
 import { TourTarget } from "../../features/tour/TourTarget";
 import { TOOL_TOUR_ID, TOURS } from "../../features/tour/tours";
@@ -49,7 +50,9 @@ export default function Sidebar() {
         ))}
       </TourTarget>
 
-      <div className="mt-auto flex flex-col gap-2 px-1">
+      <div className="mt-auto flex flex-col gap-3 px-1">
+        <CurrencyToggle />
+
         <button onClick={replayTutorial}
           className="flex items-center gap-2 px-2 text-sm text-faint transition hover:text-amber">
           <CircleHelp size={14} /> Replay tutorial
@@ -59,5 +62,32 @@ export default function Sidebar() {
         </NavLink>
       </div>
     </aside>
+  );
+}
+
+/* One click between the currency the contracts are written in and the currency
+   the person reading the screen thinks in. Nothing is recalculated — the
+   engine works in INR either way — so the two views are always the same
+   numbers, and the rate is printed rather than assumed. */
+function CurrencyToggle() {
+  const active = currency();
+  return (
+    <div>
+      <div className="kicker mb-1.5 px-2">Currency</div>
+      <div className="flex rounded-lg border border-line p-0.5">
+        {(["USD", "INR"] as const).map((c) => (
+          <button key={c} onClick={() => c !== active && setCurrency(c)}
+            title={c === "USD" ? RATE_NOTE : "Project contract currency"}
+            className={cn(
+              "flex-1 rounded-md py-1.5 text-xs font-medium transition-all",
+              c === active
+                ? "bg-amber/15 text-amber"
+                : "text-faint hover:text-muted",
+            )}>
+            {c === "USD" ? "$ USD" : "\u20b9 INR"}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,13 @@
 // Typed client for the Foreman API (backend/main.py). Vite proxies /api → :8000.
 
+import { currency } from "./currency";
+
+/** Every request tells the API which currency to format its labels in.
+ *  Sent on all verbs — a PUT returns freshly formatted values too. */
+function headers(extra?: Record<string, string>): Record<string, string> {
+  return { "X-Currency": currency(), ...(extra ?? {}) };
+}
+
 export type NodeKind = "supplier" | "material" | "activity";
 
 export interface GraphNode {
@@ -216,20 +224,20 @@ export interface ProjectDraft {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path);
+  const r = await fetch(path, { headers: headers() });
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
   return r.json();
 }
 async function post<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(path, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST", headers: headers({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `${path} → ${r.status}`);
   return r.json();
 }
 async function del<T>(path: string): Promise<T> {
-  const r = await fetch(path, { method: "DELETE" });
+  const r = await fetch(path, { method: "DELETE", headers: headers() });
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
   return r.json();
 }
@@ -250,7 +258,7 @@ export const api = {
   money: () => get<MoneySettings>("/api/money"),
   saveMoney: async (patch: Record<string, number | null>) => {
     const r = await fetch("/api/money", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: headers({ "Content-Type": "application/json" }),
       body: JSON.stringify(patch),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `money → ${r.status}`);
@@ -266,7 +274,7 @@ export const api = {
   uploadDocs: async (files: File[]) => {
     const fd = new FormData();
     files.forEach((f) => fd.append("files", f));
-    const r = await fetch("/api/docs/upload", { method: "POST", body: fd });
+    const r = await fetch("/api/docs/upload", { method: "POST", headers: headers(), body: fd });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `upload → ${r.status}`);
     return r.json() as Promise<{ saved: string[]; docs: DocFile[] }>;
   },
@@ -277,7 +285,7 @@ export const api = {
   draftProjectFromFile: async (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    const r = await fetch("/api/projects/draft-file", { method: "POST", body: fd });
+    const r = await fetch("/api/projects/draft-file", { method: "POST", headers: headers(), body: fd });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `import → ${r.status}`);
     return r.json() as Promise<ProjectDraft>;
   },

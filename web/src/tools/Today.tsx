@@ -2,11 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, PhoneCall, Eye, ShieldCheck, ChevronRight, CalendarCheck2, IndianRupee,
+  AlertTriangle, PhoneCall, Eye, ShieldCheck, ChevronRight, CalendarCheck2, IndianRupee, DollarSign,
 } from "lucide-react";
 import { api, type Brief, type BriefItem } from "../lib/api";
 import { GlassCard, Kicker, Badge } from "../components/primitives";
 import { cn } from "../lib/cn";
+
+import { currency } from "../lib/currency";
+
+/** Match the currency mark to the figures on screen. */
+const MoneyIcon = currency() === "USD" ? DollarSign : IndianRupee;
 
 /* The page that answers "is today a normal day?" without being asked.
  *
@@ -83,7 +88,7 @@ export default function Today() {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-1.5 text-faint"><IndianRupee size={13} />
+                <div className="flex items-center gap-1.5 text-faint"><MoneyIcon size={13} />
                   <span className="kicker">at stake</span></div>
                 <div className="mt-1 font-display text-lg font-bold">{brief.at_stake_label}</div>
                 <div className="text-xs text-faint">if every supplier ran a week late</div>

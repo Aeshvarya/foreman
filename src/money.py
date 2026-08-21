@@ -1,6 +1,6 @@
-"""Foreman money layer — what a delay actually COSTS, in rupees.
+"""Foreman money layer — what a delay actually COSTS.
 
-A schedule slip is an engineering fact; a rupee figure is a business decision.
+A schedule slip is an engineering fact; a cash figure is a business decision.
 Foreman already proves "handover moves +2 days". This module answers the
 question the person paying for the building actually asks: **so what?**
 
@@ -18,6 +18,8 @@ project and survive restarts. Missing = fall back to the labelled defaults.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+
 # Industry-shaped defaults for a mid-size Indian mission-critical build.
 # These are STARTING POINTS the user is expected to edit — never presented as
 # fact. `basis` is shown in the UI next to the number.
@@ -26,9 +28,9 @@ DEFAULTS: dict[str, dict] = {
         "value": 250_000,
         "label": "Late-handover penalty",
         "plain": "What the client charges you for every day you hand over late.",
-        "basis": "Typical liquidated-damages clause on an Indian data-centre "
+        "basis": "Typical liquidated-damages clause on a data-centre "
                  "contract: ~0.5% of contract value per week, capped at 5–10%. "
-                 "For a ₹350cr build that lands near ₹2.5 lakh/day.",
+                 "On a build of this size that lands near {v}/day.",
     },
     "daily_overhead": {
         "value": 85_000,
@@ -64,6 +66,42 @@ DEFAULTS: dict[str, dict] = {
 }
 
 
+# ------------------------------------------------------------------ currency
+# The engine stores and computes in INR — that is the contract currency of the
+# project data. Presentation is a separate decision: a room full of non-Indian
+# operators reads "$63K" instantly and "₹60.30 lakh" not at all.
+#
+# The rate is FIXED and stamped with its date, never fetched live. A demo that
+# silently re-prices itself between two runs is a demo nobody can check.
+USD_INR = 95.75                 # RBI reference / market close, 21 Aug 2026
+RATE_DATE = "2026-08-21"
+
+_CURRENCIES = ("USD", "INR")
+_current: ContextVar[str] = ContextVar("foreman_currency", default="USD")
+
+
+def set_currency(code: str | None) -> str:
+    """Set the display currency for this request. Unknown input -> USD."""
+    code = (code or "").strip().upper()
+    _current.set(code if code in _CURRENCIES else "USD")
+    return _current.get()
+
+
+def currency() -> str:
+    return _current.get()
+
+
+def rate_info() -> dict:
+    """Everything the UI needs to print an honest conversion footnote."""
+    return {
+        "code": currency(),
+        "usd_inr": USD_INR,
+        "rate_date": RATE_DATE,
+        "note": f"Converted at ₹{USD_INR:g} = $1, fixed {RATE_DATE}. "
+                f"The engine computes in INR; this is a display conversion.",
+    }
+
+
 def defaults() -> dict[str, int]:
     return {k: v["value"] for k, v in DEFAULTS.items()}
 
@@ -80,13 +118,17 @@ def commercials(project: dict | None = None) -> dict:
     for key, meta in DEFAULTS.items():
         raw = stored.get(key)
         has = isinstance(raw, (int, float)) and raw >= 0
+        value = int(raw) if has else meta["value"]
         out[key] = {
             "key": key,
-            "value": int(raw) if has else meta["value"],
+            "value": value,
+            "display": fmt_money(value),
             "source": "your number" if has else "assumed",
             "label": meta["label"],
             "plain": meta["plain"],
-            "basis": meta["basis"],
+            # `basis` may carry a {v} slot so the worked example reprices with
+            # the display currency instead of being frozen in rupees.
+            "basis": meta["basis"].replace("{v}", fmt_money(meta["value"])),
         }
     return out
 
@@ -142,7 +184,7 @@ def cost_of_delay(slip_days: int, project: dict | None = None) -> dict:
             "label": c[key]["label"],
             "plain": c[key]["plain"],
             "amount": per_day * slip,
-            "formula": f"{fmt_inr(per_day)}/day × {slip} day{'s' if slip != 1 else ''}",
+            "formula": f"{fmt_money(per_day)}/day × {slip} day{'s' if slip != 1 else ''}",
             "source": c[key]["source"],
             "basis": c[key]["basis"],
         })
@@ -151,22 +193,44 @@ def cost_of_delay(slip_days: int, project: dict | None = None) -> dict:
     per_day = sum(c[k]["value"] for k in ("penalty_per_day", "daily_overhead"))
     return {
         "slip_days": slip,
-        "currency": "INR",
+        "currency": currency(),
         "total": total,
-        "total_label": fmt_inr(total),
+        "total_label": fmt_money(total),
         "per_day": per_day,
-        "per_day_label": fmt_inr(per_day),
+        "per_day_label": fmt_money(per_day),
         "lines": lines,
         "assumed": any(l["source"] == "assumed" for l in lines),
     }
 
 
 # ---------------------------------------------------------------- formatting
-def fmt_inr(amount: float) -> str:
-    """Indian money, the way an Indian PM reads it: ₹4.2 lakh, ₹1.8 crore.
+def fmt_money(amount: float) -> str:
+    """Format an INR amount in whatever currency this request asked for.
 
-    Judges are Indian operators; ₹12,00,000 lands, $14,400 does not.
+    Every call site in the engine passes rupees; only this function knows the
+    reader might not think in them.
     """
+    return fmt_usd(amount) if currency() == "USD" else fmt_inr(amount)
+
+
+def fmt_usd(amount_inr: float) -> str:
+    """INR -> US dollars, in the short form a Western operator reads at a
+    glance: $63K, $1.4M. Below $10,000 we print the exact figure, because at
+    that size the precision is the point (a switching cost of "$4K" invites
+    "four thousand what?" in a way "$4,177" does not).
+    """
+    d = float(amount_inr) / USD_INR
+    sign = "-" if d < 0 else ""
+    d = abs(d)
+    if d >= 1_000_000:
+        return f"{sign}${d / 1_000_000:.2f}M".replace(".00M", "M")
+    if d >= 10_000:
+        return f"{sign}${d / 1_000:.1f}K".replace(".0K", "K")
+    return f"{sign}${d:,.0f}"
+
+
+def fmt_inr(amount: float) -> str:
+    """Indian money, the way an Indian PM reads it: ₹4.2 lakh, ₹1.8 crore."""
     a = float(amount)
     sign = "-" if a < 0 else ""
     a = abs(a)
@@ -198,4 +262,4 @@ if __name__ == "__main__":
     r = cost_of_delay(3)
     print(f"3-day slip = {r['total_label']}  ({r['per_day_label']}/day)")
     for line in r["lines"]:
-        print(f"  {line['label']:28} {fmt_inr(line['amount']):>14}   {line['formula']}  [{line['source']}]")
+        print(f"  {line['label']:28} {fmt_money(line['amount']):>14}   {line['formula']}  [{line['source']}]")
