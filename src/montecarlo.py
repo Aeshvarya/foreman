@@ -37,6 +37,18 @@ from graph import MATERIAL                # noqa: E402
 MAX_STD_DAYS = 12.0
 LATE_BIAS_DAYS = 6.0
 
+# Materials from one vendor do not fail independently. A plant fire, a strike, a
+# customs backlog — one event moves everything that vendor ships. Sampling them
+# independently lets the late ones cancel the early ones, which quietly thins the
+# tail: the model looks safer than the project is.
+#
+# So each material's draw is split into a shock its whole vendor feels and a shock
+# only it feels, blended with weights sqrt(rho) and sqrt(1 - rho). Those weights
+# are chosen because they leave every material's OWN mean and spread untouched —
+# the individual delivery forecasts do not move, only the joint behaviour does.
+# 0.0 reproduces the old independent model exactly.
+VENDOR_CORRELATION = 0.4
+
 
 @dataclass
 class MCResult:
@@ -47,6 +59,7 @@ class MCResult:
     p90_slip: float
     baseline_handover: str
     drivers: list[dict] = field(default_factory=list)   # material risk contributions
+    vendor_correlation: float = 0.0   # shared-vendor correlation this run used
 
 
 def _material_params(node) -> tuple[float, float]:
@@ -58,24 +71,52 @@ def _material_params(node) -> tuple[float, float]:
     return LATE_BIAS_DAYS * uncertainty, MAX_STD_DAYS * uncertainty
 
 
-def simulate(g=None, n: int = 3000, seed: int = 7) -> MCResult:
+def simulate(g=None, n: int = 3000, seed: int = 7,
+             vendor_correlation: float | None = None) -> MCResult:
     g = g or get_graph()
+    rho = VENDOR_CORRELATION if vendor_correlation is None else float(vendor_correlation)
+    if not 0.0 <= rho <= 1.0:
+        raise ValueError(f"vendor_correlation must be between 0 and 1, got {rho}")
+
     rng = np.random.default_rng(seed)
+    # The shared shocks are drawn from their own stream, so the per-material draws
+    # below stay the same numbers in the same order as the independent model made.
+    # That is what lets rho=0 reproduce the previous output exactly rather than
+    # merely closely.
+    vendor_rng = np.random.default_rng(seed + 1)
     handover_id = g.graph["handover"]
 
     materials = [(mid, d) for mid, d in g.nodes(data=True) if d.get("kind") == MATERIAL]
     base_arrival = {mid: date.fromisoformat(d["expected_arrival"]) for mid, d in materials}
     params = {mid: _material_params(d) for mid, d in materials}
 
+    # A material with no supplier recorded gets a vendor of its own, so it stays
+    # independent instead of being lumped in with every other orphan.
+    vendor_of = {mid: (d.get("supplier") or f"__unshared__{mid}") for mid, d in materials}
+    vendors = sorted(set(vendor_of.values()))
+    w_shared, w_private = np.sqrt(rho), np.sqrt(1.0 - rho)
+
     baseline = forward_pass(g)[handover_id].finish
 
     slips = np.zeros(n)
     delays = {mid: np.zeros(n) for mid, _ in materials}
     for i in range(n):
+        # One shock per vendor per simulated future, shared by everything it ships.
+        shocks = {v: vendor_rng.normal() for v in vendors} if rho > 0 else {}
         overrides = {}
         for mid, _ in materials:
             bias, std = params[mid]
-            d_days = rng.normal(bias, std) if std > 0 else 0.0
+            if std <= 0:
+                d_days = 0.0                      # delivered: nothing left to vary
+            elif rho == 0:
+                d_days = rng.normal(bias, std)    # untouched independent draw
+            else:
+                # Standardise this material's own draw, blend the vendor's shock
+                # into it, then put the result back on the material's own scale.
+                raw = rng.normal(bias, std)
+                private = (raw - bias) / std
+                d_days = bias + std * (w_shared * shocks[vendor_of[mid]]
+                                       + w_private * private)
             delays[mid][i] = d_days
             overrides[mid] = base_arrival[mid] + timedelta(days=int(round(d_days)))
         finish = forward_pass(g, overrides)[handover_id].finish
@@ -103,6 +144,7 @@ def simulate(g=None, n: int = 3000, seed: int = 7) -> MCResult:
         p90_slip=round(float(np.percentile(pos, 90)), 1),
         baseline_handover=baseline.isoformat(),
         drivers=drivers,
+        vendor_correlation=rho,
     )
 
 
@@ -111,6 +153,7 @@ if __name__ == "__main__":
     print(f"Monte-Carlo schedule risk ({r.n} simulations)")
     print(f"  baseline handover : {r.baseline_handover}")
     print(f"  P(handover slips) : {r.p_slip:.0%}")
+    print(f"  vendor correlation: {r.vendor_correlation}")
     print(f"  expected slip     : {r.mean_slip} days")
     print(f"  P50 / P90 slip    : {r.p50_slip} / {r.p90_slip} days")
     print("  top risk drivers  :")
