@@ -13,3 +13,7 @@ data/.llm_cache.json
 
 # private LaTeX study notebook (not for public repo)
 study/
+
+# Working notes for the local agent setup — not part of the project.
+CLAUDE.md
+.claude/
