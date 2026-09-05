@@ -5,10 +5,10 @@ next sentence is always "so what do I do about it?" This module generates the
 realistic ways to claw those days back and puts a rupee number on each, so the
 choice becomes obvious to someone who has never opened a Gantt chart:
 
-    Air-freight the steel      buys 2 days   costs ₹1.8 lakh   saves ₹5.0 lakh
-    Switch to Jindal           buys 2 days   costs ₹4.0 lakh   saves ₹2.8 lakh
-    Night shift on the roof    buys 1 day    costs ₹1.2 lakh   saves ₹2.2 lakh
-    Do nothing                                                 costs ₹6.7 lakh
+    Air-freight the steel      buys 2 days   costs $19K   saves $52K
+    Switch to Jindal           buys 2 days   costs $42K   saves $29K
+    Night shift on the roof    buys 1 day    costs $13K   saves $23K
+    Do nothing                                             costs $70K
 
 **Every "buys N days" figure is measured, not guessed.** Each option is applied
 to the real graph and the CPM cascade is re-run; the days saved is the honest

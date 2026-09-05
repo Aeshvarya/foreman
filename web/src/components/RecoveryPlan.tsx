@@ -7,7 +7,7 @@ import {
 import { api, type RecoveryPlan as Plan, type RecoveryOption, type MoneySettings } from "../lib/api";
 import { GlassCard, Kicker, Badge } from "./primitives";
 import { cn } from "../lib/cn";
-import { fmtShort, symbol, toInr, fromInr, currency, RATE_NOTE } from "../lib/currency";
+import { fmtShort, symbol, toUsd, fromUsd, currency, RATE_NOTE } from "../lib/currency";
 
 /** The currency mark, as an icon, so headline panels match the numbers
  *  underneath them instead of showing a rupee sign over a dollar total. */
@@ -230,7 +230,7 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
   async function save() {
     const patch: Record<string, number | null> = {};
     for (const [k, v] of Object.entries(draft))
-      patch[k] = v.trim() === "" ? null : toInr(Number(v));   // UI currency -> INR for the API
+      patch[k] = v.trim() === "" ? null : toUsd(Number(v));   // UI currency -> USD for the API
     try {
       const next = await api.saveMoney(patch);
       setSettings(next); setDraft({}); setError("");
@@ -259,8 +259,8 @@ function MoneySettingsPanel({ onClose, onSaved }: { onClose: () => void; onSaved
               <p className="mb-1.5 mt-0.5 text-xs text-faint">{s.plain}</p>
               <div className="flex items-center gap-2">
                 <span className="text-muted">{symbol()}</span>
-                <input inputMode="numeric" placeholder={String(fromInr(s.value))}
-                  value={draft[s.key] ?? (s.source === "your number" ? String(fromInr(s.value)) : "")}
+                <input inputMode="numeric" placeholder={String(fromUsd(s.value))}
+                  value={draft[s.key] ?? (s.source === "your number" ? String(fromUsd(s.value)) : "")}
                   onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })}
                   className="w-full rounded-lg border border-line bg-black/30 px-3 py-1.5 font-mono text-sm
                     outline-none focus:border-amber/50" />

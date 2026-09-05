@@ -1,6 +1,6 @@
 """The last mile — turn the analysis into the messages someone actually sends.
 
-Foreman can prove a delay costs ₹6.7 lakh and that air-freighting the steel is
+Foreman can prove a delay costs $70K and that air-freighting the steel is
 the cheapest way out. None of that moves until a human writes to the supplier
 and warns the client. That writing is where good analysis usually dies: it is
 awkward, it is political, and it is easy to put off until tomorrow.

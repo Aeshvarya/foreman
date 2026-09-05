@@ -20,8 +20,8 @@ cheapest answer get worse until there is no answer left but the penalty.
 
 That produces the sentence the whole product exists to earn:
 
-    "Act today and it costs ₹1.8 lakh. Find out when the truck doesn't turn
-     up and it costs ₹6.7 lakh. Foreman is telling you 11 days early."
+    "Act today and it costs $19K. Find out when the truck doesn't turn
+     up and it costs $70K. Foreman is telling you 11 days early."
 """
 
 from __future__ import annotations

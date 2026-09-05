@@ -10,7 +10,7 @@ ranked list of sentences a non-technical person can act on:
 
     "Diesel generators can only slip 4 more days before the handover moves,
      and the last update was a phone call. Chase it today — a week's slip
-     costs ₹16.75 lakh."
+     costs $175K."
 
 Nothing here is new intelligence. It is the risk radar, the cascade engine and
 the money layer, asked on the user's behalf and phrased in plain words.

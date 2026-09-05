@@ -14,18 +14,21 @@ Two honest design rules, because a judge will push on this:
 
 Numbers live on the project file under `commercials`, so they travel with the
 project and survive restarts. Missing = fall back to the labelled defaults.
+
+**Base unit is USD.** Defaults are a US mission-critical build cost base; INR
+is a display conversion only (see the currency block below).
 """
 
 from __future__ import annotations
 
 from contextvars import ContextVar
 
-# Industry-shaped defaults for a mid-size Indian mission-critical build.
+# Industry-shaped defaults for a mid-size US mission-critical build.
 # These are STARTING POINTS the user is expected to edit — never presented as
 # fact. `basis` is shown in the UI next to the number.
 DEFAULTS: dict[str, dict] = {
     "penalty_per_day": {
-        "value": 250_000,
+        "value": 25_000,
         "label": "Late-handover penalty",
         "plain": "What the client charges you for every day you hand over late.",
         "basis": "Typical liquidated-damages clause on a data-centre "
@@ -33,7 +36,7 @@ DEFAULTS: dict[str, dict] = {
                  "On a build of this size that lands near {v}/day.",
     },
     "daily_overhead": {
-        "value": 85_000,
+        "value": 9_000,
         "label": "Extra site running cost",
         "plain": "Cranes, site staff, security and site office you keep paying "
                  "for while the job runs longer.",
@@ -41,7 +44,7 @@ DEFAULTS: dict[str, dict] = {
                  "supervision staff and site establishment, per calendar day.",
     },
     "expedite_day_rate": {
-        "value": 60_000,
+        "value": 6_500,
         "label": "Cost to pull a delivery forward",
         "plain": "Roughly what it costs to buy back ONE day — air freight, a "
                  "second fabrication shift, or a part shipment.",
@@ -49,7 +52,7 @@ DEFAULTS: dict[str, dict] = {
                  "spread across the days it actually recovers.",
     },
     "switching_cost": {
-        "value": 400_000,
+        "value": 42_000,
         "label": "Cost to switch supplier",
         "plain": "One-time cost of moving an order to a different vendor — "
                  "re-approval, cancellation, price difference.",
@@ -57,7 +60,7 @@ DEFAULTS: dict[str, dict] = {
                  "premium a replacement vendor charges on short notice.",
     },
     "overtime_day_rate": {
-        "value": 120_000,
+        "value": 13_000,
         "label": "Cost of working overtime on site",
         "plain": "Cost of a night shift or weekend crew to finish a job faster.",
         "basis": "Second-shift labour premium plus supervision for a crew "
@@ -67,12 +70,12 @@ DEFAULTS: dict[str, dict] = {
 
 
 # ------------------------------------------------------------------ currency
-# The engine stores and computes in INR — that is the contract currency of the
-# project data. Presentation is a separate decision: a room full of non-Indian
-# operators reads "$63K" instantly and "₹60.30 lakh" not at all.
+# The engine stores and computes in USD. Every default, every stored
+# commercial value and every figure the engine returns is a dollar amount.
 #
-# The rate is FIXED and stamped with its date, never fetched live. A demo that
-# silently re-prices itself between two runs is a demo nobody can check.
+# INR remains available as a DISPLAY option for Indian projects, converted at a
+# FIXED rate stamped with its date, never fetched live. A demo that silently
+# re-prices itself between two runs is a demo nobody can check.
 USD_INR = 95.75                 # RBI reference / market close, 21 Aug 2026
 RATE_DATE = "2026-08-21"
 
@@ -97,8 +100,8 @@ def rate_info() -> dict:
         "code": currency(),
         "usd_inr": USD_INR,
         "rate_date": RATE_DATE,
-        "note": f"Converted at ₹{USD_INR:g} = $1, fixed {RATE_DATE}. "
-                f"The engine computes in INR; this is a display conversion.",
+        "note": f"The engine computes in USD. INR shown at ₹{USD_INR:g} = $1, "
+                f"fixed {RATE_DATE} — a display conversion only.",
     }
 
 
@@ -167,7 +170,7 @@ def clean_patch(patch: dict) -> dict:
 
 # ------------------------------------------------------------------ the math
 def cost_of_delay(slip_days: int, project: dict | None = None) -> dict:
-    """Rupee cost of the handover slipping `slip_days` days.
+    """Dollar cost of the handover slipping `slip_days` days.
 
     Deliberately only two lines. A real quantity surveyor would add a dozen
     more, but every extra line is another thing the team has to defend live —
@@ -204,22 +207,23 @@ def cost_of_delay(slip_days: int, project: dict | None = None) -> dict:
 
 
 # ---------------------------------------------------------------- formatting
-def fmt_money(amount: float) -> str:
-    """Format an INR amount in whatever currency this request asked for.
+def fmt_money(amount_usd: float) -> str:
+    """Format a USD amount in whatever currency this request asked for.
 
-    Every call site in the engine passes rupees; only this function knows the
-    reader might not think in them.
+    Every call site in the engine passes dollars; only this function knows the
+    reader might want rupees instead.
     """
-    return fmt_usd(amount) if currency() == "USD" else fmt_inr(amount)
+    return (fmt_usd(amount_usd) if currency() == "USD"
+            else fmt_inr(float(amount_usd) * USD_INR))
 
 
-def fmt_usd(amount_inr: float) -> str:
-    """INR -> US dollars, in the short form a Western operator reads at a
-    glance: $63K, $1.4M. Below $10,000 we print the exact figure, because at
-    that size the precision is the point (a switching cost of "$4K" invites
-    "four thousand what?" in a way "$4,177" does not).
+def fmt_usd(amount_usd: float) -> str:
+    """US dollars in the short form an operator reads at a glance: $63K, $1.4M.
+    Below $10,000 we print the exact figure, because at that size the precision
+    is the point (a switching cost of "$4K" invites "four thousand what?" in a
+    way "$4,177" does not).
     """
-    d = float(amount_inr) / USD_INR
+    d = float(amount_usd)
     sign = "-" if d < 0 else ""
     d = abs(d)
     if d >= 1_000_000:
@@ -230,7 +234,11 @@ def fmt_usd(amount_inr: float) -> str:
 
 
 def fmt_inr(amount: float) -> str:
-    """Indian money, the way an Indian PM reads it: ₹4.2 lakh, ₹1.8 crore."""
+    """Indian money, the way an Indian PM reads it: ₹4.2 lakh, ₹1.8 crore.
+
+    Takes an INR amount. The engine's base unit is USD, so callers convert
+    first — `fmt_money` is the one that decides.
+    """
     a = float(amount)
     sign = "-" if a < 0 else ""
     a = abs(a)
