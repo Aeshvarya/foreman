@@ -14,6 +14,8 @@ Usage:
 
 from __future__ import annotations
 
+import json
+
 import os
 from pathlib import Path
 
@@ -112,7 +114,10 @@ def load_to_neo4j(project: dict | None = None) -> dict:
             )
 
         for act in project["activities"]:
-            s.run("CREATE (n:Activity $p) SET n.kind=$k", p=act, k=ACTIVITY)
+            props = dict(act)
+            if "links" in props:  # Neo4j properties cannot be maps — store as JSON
+                props["links"] = json.dumps(props["links"])
+            s.run("CREATE (n:Activity $p) SET n.kind=$k", p=props, k=ACTIVITY)
 
         # Edges that carry the flow of consequence.
         for act in project["activities"]:
@@ -149,6 +154,8 @@ def graph_from_neo4j() -> nx.DiGraph:
 
         for rec in s.run("MATCH (n) WHERE n.id IS NOT NULL RETURN n"):
             props = dict(rec["n"])
+            if isinstance(props.get("links"), str):
+                props["links"] = json.loads(props["links"])
             g.add_node(props["id"], **props)
 
         for rec in s.run(

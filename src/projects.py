@@ -165,6 +165,11 @@ def _normalise(data: dict) -> dict:
         # single project start; dependency + material constraints derive the
         # real earliest start, so users never enter per-activity dates.
         "early_start": a.get("early_start", start),
+        # typed P6 relationships (FS/SS/FF/SF + lag), present on imported schedules
+        **({"links": [{"pred": ln["pred"],
+                       "type": str(ln.get("type", "FS")).upper(),
+                       "lag_days": int(ln.get("lag_days", 0))}
+                      for ln in a["links"]]} if a.get("links") else {}),
     } for a in data.get("activities", [])]
 
     # ---- integrity: no dangling references, no dependency cycles ----
@@ -181,6 +186,10 @@ def _normalise(data: dict) -> dict:
     for a in activities:  # drop dangling / self references
         a["needs_materials"] = [m for m in a["needs_materials"] if m in mat_ids]
         a["depends_on"] = [d for d in a["depends_on"] if d in act_ids and d != a["id"]]
+        if "links" in a:  # a typed link must point at a real, listed predecessor
+            a["links"] = [ln for ln in a["links"]
+                          if ln["pred"] in a["depends_on"]
+                          and ln["type"] in ("FS", "SS", "FF", "SF")]
     if not _acyclic(activities):
         raise ValueError("activity dependencies contain a cycle — a schedule cannot loop")
 

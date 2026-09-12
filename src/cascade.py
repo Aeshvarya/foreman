@@ -70,6 +70,24 @@ class CascadeReport:
     mitigation: str = ""
 
 
+def _activity_order(g: nx.DiGraph) -> list[str]:
+    """Activities in dependency order, computed once per graph.
+
+    Sorting a subgraph view dominated the forward pass (about three quarters of
+    its time on a 1,500-activity schedule), and the radar and Monte-Carlo run
+    the pass thousands of times over a graph that never changes shape. The
+    cache is keyed on the graph's size so a rebuilt or edited graph re-sorts.
+    """
+    key = (g.number_of_nodes(), g.number_of_edges())
+    cached = g.graph.get("_activity_order")
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    activities = [n for n, d in g.nodes(data=True) if d["kind"] == ACTIVITY]
+    order = list(nx.topological_sort(g.subgraph(activities)))
+    g.graph["_activity_order"] = (key, order)
+    return order
+
+
 def forward_pass(g: nx.DiGraph,
                  arrival_overrides: dict[str, date] | None = None,
                  duration_overrides: dict[str, int] | None = None,
@@ -85,19 +103,43 @@ def forward_pass(g: nx.DiGraph,
     """
     arrival_overrides = arrival_overrides or {}
     duration_overrides = duration_overrides or {}
-    activities = [n for n, d in g.nodes(data=True) if d["kind"] == ACTIVITY]
     schedule: dict[str, ActivitySchedule] = {}
 
-    for act_id in nx.topological_sort(g.subgraph(activities)):
+    for act_id in _activity_order(g):
         node = g.nodes[act_id]
         # Constraint 1: planned early start from the baseline schedule
         earliest = _d(node["early_start"])
 
-        # Constraint 2: upstream activities must finish first
-        for dep in node["depends_on"]:
-            dep_finish = schedule[dep].finish
-            if dep_finish > earliest:
-                earliest = dep_finish
+        duration = max(0, duration_overrides.get(act_id, node["duration_days"]))
+
+        # Constraint 2: upstream activities. A hand-built project lists plain
+        # finish-to-start predecessors in `depends_on`. A schedule imported from
+        # P6 also carries `links`, because real schedules use start-to-start,
+        # finish-to-finish and lags, and treating those as finish-to-start
+        # would invent delays that the schedule does not contain.
+        links = node.get("links")
+        if links:
+            for ln in links:
+                pred = schedule.get(ln["pred"])
+                if pred is None:
+                    continue
+                lag = timedelta(days=int(ln.get("lag_days", 0)))
+                kind = ln.get("type", "FS")
+                if kind == "SS":        # start no earlier than pred start + lag
+                    bound = pred.start + lag
+                elif kind == "FF":      # finish no earlier than pred finish + lag
+                    bound = pred.finish + lag - timedelta(days=duration)
+                elif kind == "SF":      # finish no earlier than pred start + lag
+                    bound = pred.start + lag - timedelta(days=duration)
+                else:                   # FS: start no earlier than pred finish + lag
+                    bound = pred.finish + lag
+                if bound > earliest:
+                    earliest = bound
+        else:
+            for dep in node["depends_on"]:
+                dep_finish = schedule[dep].finish
+                if dep_finish > earliest:
+                    earliest = dep_finish
 
         # Constraint 3: materials must have arrived
         for mat_id in node["needs_materials"]:
@@ -106,8 +148,7 @@ def forward_pass(g: nx.DiGraph,
             if arrival > earliest:
                 earliest = arrival
 
-        duration = duration_overrides.get(act_id, node["duration_days"])
-        finish = earliest + timedelta(days=max(0, duration))
+        finish = earliest + timedelta(days=duration)
         schedule[act_id] = ActivitySchedule(act_id, node["name"], earliest, finish)
 
     return schedule
