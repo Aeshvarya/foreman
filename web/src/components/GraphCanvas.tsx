@@ -21,8 +21,15 @@ const LARGE_AT = 40;
 /* A traced path keeps where the item lands (+1 step) and the last steps into
    handover, and folds the middle into one "N more" node — so a 1,000-step
    chain still fits on one screen at a readable zoom. */
-const PATH_HEAD = 2;
+const PATH_HEAD = 3;
 const PATH_TAIL = 3;
+/* How many slipped P&D items trace mode draws, ranked by how much work each
+   pushes back. Unlimited for now so every item is visible; set it to 12 to draw
+   only the items that matter most (the header then says how many were left out). */
+const MAX_TRACED = Number.POSITIVE_INFINITY;
+/* Trace-mode spacing: wider columns and taller rows than the full view, so a
+   path reads left → right instead of as a dense stack. */
+const T_GAP = 96, T_STEP = 230, T_ACT_X = 260;
 /* When the handover holds, how many absorbed-but-pushed-back activities to show
    downstream of each item before stopping. */
 const SIDE_CAP = 8;
@@ -33,9 +40,9 @@ const KIND_TAG: Record<Kind, string> = { supplier: "Supplier", material: "P&D it
    "watch what breaks light up" signature. Material pills are clickable: click
    one to slip it (far easier than a dropdown). */
 function FMNode({ data }: NodeProps) {
-  const { label, name, state, clickable, faded, kind, isHandover, sub } = data as {
+  const { label, name, state, clickable, faded, kind, isHandover, sub, big } = data as {
     label: string; name: string; state: State; clickable: boolean; faded: boolean;
-    kind: Kind; isHandover: boolean; sub?: string;
+    kind: Kind; isHandover: boolean; sub?: string; big?: boolean;
   };
   const styles: Record<State, string> = {
     dim: "border-line-strong bg-elev/95 text-muted",
@@ -55,9 +62,9 @@ function FMNode({ data }: NodeProps) {
   const tag = isHandover ? "Handover" : KIND_TAG[kind];
   const code = sub ?? (kind === "activity" && label !== name ? label : "");
   return (
-    <div className={`w-[172px] rounded-xl border px-3 py-1.5 backdrop-blur-sm transition-all duration-300 ${styles[state]} ${clickHint} ${faded ? "opacity-[0.28]" : "opacity-100"}`}>
+    <div className={`${big ? "w-[184px]" : "w-[172px]"} rounded-xl border px-3 py-1.5 backdrop-blur-sm transition-all duration-300 ${styles[state]} ${clickHint} ${faded ? "opacity-[0.28]" : "opacity-100"}`}>
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
-      <div className="flex items-center justify-between gap-2 text-[0.55rem] font-semibold uppercase tracking-[0.08em] opacity-70">
+      <div className={`flex items-center justify-between gap-2 ${big ? "text-[0.62rem]" : "text-[0.55rem]"} font-semibold uppercase tracking-[0.08em] opacity-70`}>
         <span>{tag}</span>
         {code && <span className="truncate font-mono normal-case tracking-normal">{code}</span>}
       </div>
@@ -65,7 +72,7 @@ function FMNode({ data }: NodeProps) {
           means nothing to them, so it is kept as the tooltip only. */}
       <div className="flex items-center gap-2" title={label}>
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-current" : "bg-steel"}`} />
-        <span className="truncate text-[0.72rem] font-semibold leading-tight">{name}</span>
+        <span className={`truncate ${big ? "text-[0.82rem]" : "text-[0.72rem]"} font-semibold leading-tight`}>{name}</span>
       </div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
     </div>
@@ -76,10 +83,10 @@ function FMNode({ data }: NodeProps) {
 function FoldNode({ data }: NodeProps) {
   const { count } = data as { count: number };
   return (
-    <div className="w-[172px] rounded-xl border border-dashed border-red/60 bg-red/[0.07] px-3 py-2 text-center text-red">
+    <div className="w-[184px] rounded-xl border border-dashed border-red/60 bg-red/[0.07] px-3 py-2 text-center text-red">
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
-      <div className="text-[0.72rem] font-semibold">… {count} more activities</div>
-      <div className="text-[0.55rem] uppercase tracking-[0.08em] opacity-70">pushed back on this path</div>
+      <div className="text-[0.82rem] font-semibold">… {count} more activities</div>
+      <div className="text-[0.62rem] uppercase tracking-[0.08em] opacity-70">pushed back on this path</div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-line-strong" />
     </div>
   );
@@ -148,20 +155,37 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
     out.get(e.source)!.push(e.target);
   }
   const H = project.handover;
+  const fedOf = (m: string) => (out.get(m) ?? []).filter((f) => kindOf.get(f) === "activity");
+
+  // How much schedule an item pushes back: the pushed-back activities you can
+  // reach from where it lands. Decides which items to draw when there are many.
+  const reach = (m: string) => {
+    const queue = fedOf(m).filter((f) => slipped.has(f));
+    const seen = new Set<string>(queue);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const nx of out.get(cur) ?? [])
+        if (!seen.has(nx) && slipped.has(nx)) { seen.add(nx); queue.push(nx); }
+    }
+    return seen.size;
+  };
+  const all = [...delayed].filter((id) => kindOf.get(id) === "material");
+  // P&D items whose Schedule Activity ID matched nothing in P6: they cannot
+  // move the handover, and the screen should say so rather than look empty.
+  const unlinked = all.filter((m) => fedOf(m).length === 0).map((m) => nodeById.get(m)?.name ?? m);
+  const traced = all
+    .map((m) => ({ m, r: reach(m) }))
+    .sort((a, b) => b.r - a.r || a.m.localeCompare(b.m, undefined, { numeric: true }))
+    .slice(0, MAX_TRACED)
+    .map((x) => x.m);
+
   const visible = new Set<string>([H]);
   const synthetic: Edge[] = [];
   const folds: { id: string; count: number }[] = [];
 
-  const items = [...delayed].filter((id) => kindOf.get(id) === "material");
-  // P&D items whose Schedule Activity ID matched nothing in P6: they cannot
-  // move the handover, and the screen should say so rather than look empty.
-  const unlinked: string[] = [];
-  for (const m of items) {
+  for (const m of traced) {
     visible.add(m);
-    let linked = false;
-    for (const f of out.get(m) ?? []) {
-      if (kindOf.get(f) !== "activity") continue;
-      linked = true;
+    for (const f of fedOf(m)) {
       visible.add(f);
       // Shortest route (in steps) from where the item lands to handover,
       // walking only through activities that were actually pushed back.
@@ -200,7 +224,6 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
         nearest.slice(0, SIDE_CAP).forEach((n) => visible.add(n));
       }
     }
-    if (!linked) unlinked.push(nodeById.get(m)?.name ?? m);
   }
 
   // Real edges among what's shown (skipping ones that jump across a fold,
@@ -212,17 +235,19 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
   const edges: Edge[] = [];
   project.edges.forEach((e, i) => {
     if (!visible.has(e.source) || !visible.has(e.target) || foldedAway(e.source, e.target)) return;
+    if (kindOf.get(e.source) === "supplier") return;   // vendor rides inside the item
     const isHot = hot.has(e.source) && (hot.has(e.target) || e.target === H);
     edges.push({ id: `e${i}`, source: e.source, target: e.target, type: "default",
                  animated: isHot, className: isHot ? "fm-hot" : "fm-dim" });
   });
   edges.push(...synthetic);
 
-  // Layered layout: each activity sits one column right of its latest
-  // visible predecessor, so a path reads left → right to handover.
+  // Columns by dependency depth: each activity sits one column right of its
+  // latest visible predecessor, so a path reads left → right to handover.
   const actIds = [...visible].filter((id) => kindOf.get(id) === "activity").concat(folds.map((f) => f.id));
+  const actSet = new Set(actIds);
   const preds = new Map<string, string[]>(actIds.map((id) => [id, []]));
-  for (const e of edges) if (preds.has(e.target) && preds.has(e.source)) preds.get(e.target)!.push(e.source);
+  for (const e of edges) if (actSet.has(e.target) && actSet.has(e.source)) preds.get(e.target)!.push(e.source);
   const level = new Map<string, number>();
   const levelOf = (id: string, seen = new Set<string>()): number => {
     if (level.has(id)) return level.get(id)!;
@@ -235,7 +260,7 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
   };
   actIds.forEach((id) => levelOf(id));
   const maxLevel = Math.max(0, ...actIds.filter((id) => id !== H).map((id) => level.get(id) ?? 0));
-  if (actIds.includes(H)) level.set(H, maxLevel + 1);     // handover always last
+  if (actSet.has(H)) level.set(H, maxLevel + 1);     // handover always last
 
   const columns = new Map<number, string[]>();
   for (const id of actIds) {
@@ -243,24 +268,36 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
     if (!columns.has(l)) columns.set(l, []);
     columns.get(l)!.push(id);
   }
-  const pos = new Map<string, { x: number; y: number }>();
-  const ACT_X = 220, STEP = 200;
-  for (const [l, ids] of columns)
-    ids.forEach((id, i) => pos.set(id, { x: ACT_X + l * STEP, y: (i - (ids.length - 1) / 2) * GAP }));
-  // No supplier column here: it would cost a whole column of zoom on a path
-  // that is already long. The vendor rides inside the P&D item instead.
-  const mats = [...visible].filter((id) => kindOf.get(id) === "material");
-  mats.forEach((id, i) => pos.set(id, { x: 0, y: (i - (mats.length - 1) / 2) * GAP }));
 
-  const nodes: Node[] = [...visible].map((id) => {
+  // Rows: items in order of how much they push back; every later column is
+  // ordered by the average height of what feeds it, so lines cross less.
+  const pos = new Map<string, { x: number; y: number }>();
+  const center = (i: number, n: number) => (i - (n - 1) / 2) * T_GAP;
+  traced.forEach((id, i) => pos.set(id, { x: 0, y: center(i, traced.length) }));
+  const feeders = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!feeders.has(e.target)) feeders.set(e.target, []);
+    feeders.get(e.target)!.push(e.source);
+  }
+  const avgY = (id: string) => {
+    const ys = (feeders.get(id) ?? []).map((p) => pos.get(p)?.y).filter((y): y is number => y !== undefined);
+    return ys.length ? ys.reduce((s, y) => s + y, 0) / ys.length : Number.POSITIVE_INFINITY;
+  };
+  for (const l of [...columns.keys()].sort((a, b) => a - b)) {
+    const order = columns.get(l)!.map((id, k) => ({ id, k, y: avgY(id) }))
+      .sort((a, b) => (a.y === b.y ? a.k - b.k : a.y - b.y));
+    order.forEach(({ id }, i) => pos.set(id, { x: T_ACT_X + l * T_STEP, y: center(i, order.length) }));
+  }
+
+  const nodes: Node[] = [...visible].filter((id) => pos.has(id)).map((id) => {
     const n = nodeById.get(id)!;
     const kind = n.kind as Kind;
     return {
-      id, type: "fm", position: pos.get(id) ?? { x: 0, y: 0 },
+      id, type: "fm", position: pos.get(id)!,
       data: { label: id, name: shortName(n.name), kind, isHandover: id === H,
               state: stateOf(id, delayed, slipped, H, handoverBreaks),
               clickable: kind === "material", faded: false,
-              sub: kind === "material" ? nodeById.get(n.supplier ?? "")?.name : undefined },
+              sub: kind === "material" ? nodeById.get(n.supplier ?? "")?.name : undefined, big: true },
       draggable: false,
     };
   });
@@ -269,7 +306,7 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
                  data: { count: fd.count }, draggable: false });
 
   const shownActivities = actIds.length - folds.length;
-  return { nodes, edges, shownActivities, items: items.length, unlinked };
+  return { nodes, edges, shownActivities, items: traced.length, totalItems: all.length, unlinked };
 }
 
 export default function GraphCanvas({
@@ -292,7 +329,8 @@ export default function GraphCanvas({
     const delayed = delayedIds ?? new Set<string>();
     return large
       ? traceView(project, delayed, slipped, handoverBreaks)
-      : { ...fullView(project, delayed, slipped, handoverBreaks), items: delayed.size, unlinked: [] as string[] };
+      : { ...fullView(project, delayed, slipped, handoverBreaks), items: delayed.size,
+          totalItems: delayed.size, unlinked: [] as string[] };
     // Keyed on the Sets' CONTENTS, not their object identity: a caller that
     // rebuilds `new Set(...)` inline every render would otherwise invalidate
     // this memo forever, and React Flow silently drops its edges when fed new
@@ -334,7 +372,9 @@ export default function GraphCanvas({
   }, []);
 
   const headers = large
-    ? [`Tracing ${view.items} P&D item${view.items === 1 ? "" : "s"}`,
+    ? [view.totalItems > view.items
+         ? `Tracing ${view.items} of ${view.totalItems} P&D items`
+         : `Tracing ${view.items} P&D item${view.items === 1 ? "" : "s"}`,
        `showing ${view.shownActivities} of ${project.counts.activities.toLocaleString()} activities`]
     : ["Suppliers", "P&D items", "Schedule activities → Handover"];
 
@@ -357,7 +397,7 @@ export default function GraphCanvas({
           requestAnimationFrame(() => setReadyKey(nodeKeyRef.current));
           setTimeout(() => inst.fitView({ padding: 0.12 }), 60);
         }}
-        proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.4}>
+        proOptions={{ hideAttribution: true }} minZoom={large ? 0.05 : 0.2} maxZoom={1.4}>
         <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgba(255,255,255,0.05)" />
         <Panel position="top-left" className="!m-4 flex flex-col gap-2">
           <div className="flex gap-2">
@@ -366,8 +406,12 @@ export default function GraphCanvas({
             ))}
           </div>
           <span className="kicker !text-amber/80">
-            {large ? "↳ large schedule — add P&D items on the left to trace their path to handover"
-                   : "↳ click materials to slip several at once"}
+            {!large ? "↳ click materials to slip several at once"
+              : view.totalItems > view.items
+                ? `↳ showing the ${view.items} that push back the most work — remove some on the left to see others`
+                : view.items > 12
+                  ? "↳ many items traced — scroll to zoom in, drag to move around"
+                  : "↳ large schedule — add P&D items on the left to trace their path to handover"}
           </span>
         </Panel>
         {large && view.items === 0 && (
@@ -379,7 +423,7 @@ export default function GraphCanvas({
           </Panel>
         )}
         {view.unlinked.length > 0 && (
-          <Panel position="top-center" className="!mt-24 max-w-md rounded-xl border border-amber/40 bg-elev/85 px-4 py-3 text-center backdrop-blur">
+          <Panel position="bottom-left" className="!m-4 max-w-sm rounded-xl border border-amber/40 bg-elev/85 px-4 py-3 backdrop-blur">
             <div className="text-xs font-semibold text-amber">
               Not linked to the schedule: {view.unlinked.map(shortName).join(", ")}
             </div>
