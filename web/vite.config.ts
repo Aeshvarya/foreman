@@ -6,7 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": { target: "http://localhost:8000", changeOrigin: true },
+      // Override when something else already owns port 8000:
+      //   FOREMAN_API_URL=http://localhost:8001 npm run dev
+      "/api": { target: process.env.FOREMAN_API_URL ?? "http://localhost:8000", changeOrigin: true },
     },
   },
 });
