@@ -166,15 +166,30 @@ def graph_from_neo4j() -> nx.DiGraph:
     return g
 
 
+def _active_project() -> dict | None:
+    """The project the user has selected, or None to fall back to the bundled demo.
+
+    The JSON path used to call build_graph() with no argument, which always loads
+    data/project.json — so without Neo4j, switching or importing a project changed
+    the brief and the money figures but left every graph screen on the demo.
+    """
+    try:
+        import projects
+        return projects.get_active_project()
+    except Exception as e:  # missing index / file: the demo is a safe floor
+        print(f"[db] no active project ({e}); using the bundled demo")
+        return None
+
+
 def get_graph() -> nx.DiGraph:
     """The graph the app/agents use: Neo4j-backed, JSON fallback for resilience."""
     if not neo4j_enabled():          # deployed without a graph store: go direct
-        return build_graph()
+        return build_graph(_active_project())
     try:
         return graph_from_neo4j()
     except Exception as e:  # Docker down mid-demo -> never crash the UI
-        print(f"[db] Neo4j unavailable ({e}); falling back to project.json")
-        return build_graph()
+        print(f"[db] Neo4j unavailable ({e}); falling back to the active project JSON")
+        return build_graph(_active_project())
 
 
 def load_to_neo4j_if_enabled(project: dict | None = None) -> dict | None:
