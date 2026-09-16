@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import DataProvenance from "../components/DataProvenance";
+import ImportBanner from "../components/ImportBanner";
 import { useProject } from "../lib/useProject";
 import { useTour } from "../features/tour/TourProvider";
 import { TourTarget } from "../features/tour/TourTarget";
@@ -13,6 +14,7 @@ import Radar from "../tools/Radar";
 import Ask from "../tools/Ask";
 import Build from "../tools/Build";
 import NewProject from "../tools/NewProject";
+import Compare from "../tools/Compare";
 
 const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
   today: { title: "Today", sub: "What needs you right now — read for you, in plain English.", el: Today },
@@ -20,7 +22,8 @@ const TOOLS: Record<string, { title: string; sub: string; el: React.FC }> = {
   radar: { title: "Risk Radar", sub: "How much each delivery can slip before your handover date moves.", el: Radar },
   ask: { title: "Ask Foreman", sub: "Ask about the project in your own words, and watch it work the answer out.", el: Ask },
   build: { title: "Build from Docs", sub: "Point it at your emails and delivery notes — it reads them and builds the picture.", el: Build },
-  new: { title: "New Project", sub: "Describe your project in a sentence, or upload the spreadsheet you already have.", el: NewProject },
+  changes: { title: "Schedule Changes", sub: "Two updates of a schedule side by side: what moved, what lost float, and whether completion slipped.", el: Compare },
+  new: { title: "New Project", sub: "Import your P6 schedule, describe the project in a sentence, or enter it by hand.", el: NewProject },
 };
 
 export default function Dashboard() {
@@ -70,6 +73,7 @@ export default function Dashboard() {
         </header>
         <div className="px-8 py-7">
           {project?.demo && <DataProvenance />}
+          {project?.provenance && tool !== "new" && <ImportBanner p={project.provenance} />}
           <ErrorBoundary key={tool}>
             <Tool />
           </ErrorBoundary>

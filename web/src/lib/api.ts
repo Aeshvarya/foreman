@@ -27,9 +27,36 @@ export interface Project {
   /** True when the active project is the bundled synthetic demo, so the UI can
    * label it as such on screen rather than only in the README. */
   demo?: boolean;
+  /** Where an imported project came from and what had to be approximated. */
+  provenance?: ImportProvenance | null;
   counts: { suppliers: number; materials: number; activities: number; edges: number };
   nodes: GraphNode[];
   edges: GraphEdge[];
+}
+
+/** What an imported project remembers about its source, shown beside its numbers. */
+export interface ImportProvenance {
+  source: string;
+  pd_source: string | null;
+  format_label: string;
+  counts: { activities: number; links: number; materials: number; suppliers: number };
+  links_source: string;
+  materials_source: string;
+  confidence_source: string;
+  handover: { id: string; name: string; p6_finish: string | null; matches_p6: boolean; moved_before_any_delay: number };
+  notes: string[];
+  warnings: string[];
+  imported: string;
+}
+
+/** The import preview: everything above, plus what's in the file to choose from. */
+export interface ImportReport extends ImportProvenance {
+  format: "xer" | "activity_table";
+  projects: { id: string; name: string; activities: number }[];
+  chosen: string;
+  suggested_name: string;
+  stats: Record<string, number>;
+  saved_as?: string;
 }
 
 export interface Material { id: string; name: string; supplier: string; confidence: number; }
@@ -55,6 +82,35 @@ export interface MonteCarlo {
   n: number; p_slip: number; mean_slip: number; p50_slip: number; p90_slip: number;
   baseline_handover: string;
   drivers: { material: string; name: string; risk_contribution: number }[];
+  /** Share of still-moving items whose confidence is a stand-in, not a reported status. */
+  placeholder_share?: number;
+}
+
+/** One version of one project inside an uploaded file. */
+export interface SnapshotOption {
+  key: string; label: string; activities: number; current: boolean; data_date: string | null;
+}
+export interface ChangeRow {
+  id: string; name: string; old_finish: string; new_finish: string; shift_days: number;
+  old_float: number | null; new_float: number | null; done: boolean;
+}
+/** What changed between two updates of a schedule, from P6's own dates and float. */
+export interface Comparison {
+  older_options: SnapshotOption[]; newer_options: SnapshotOption[];
+  older_key: string; newer_key: string;
+  older: SnapshotOption; newer: SnapshotOption;
+  headline: string;
+  counts: {
+    matched: number; added: number; removed: number; later: number; earlier: number;
+    unchanged: number; lost_float: number; gained_float: number; newly_critical: number;
+  };
+  median_shift_days: number | null;
+  completion: {
+    older: { id: string; name: string; finish: string } | null;
+    newer: { id: string; name: string; finish: string } | null;
+    shift_days: number | null;
+  };
+  top_slipped: ChangeRow[]; top_float_lost: ChangeRow[]; deliveries: ChangeRow[];
 }
 
 export interface AltSupplier {
@@ -73,7 +129,7 @@ export interface TraceStep { step: string; detail: string; say?: string; }
  * the technical view and as a fallback. */
 export interface Citation { id: string; name: string; }
 export interface AskResult {
-  answer: string; citations: Citation[]; trace: TraceStep[]; mode: "query" | "cascade" | "scene";
+  answer: string; citations: Citation[]; trace: TraceStep[]; mode: "query" | "cascade" | "scene" | "radar";
 }
 
 /** Snapshot of the live Cascade Simulator state, sent to /api/ask so the
@@ -288,6 +344,29 @@ export const api = {
     const r = await fetch("/api/projects/draft-file", { method: "POST", headers: headers(), body: fd });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `import → ${r.status}`);
     return r.json() as Promise<ProjectDraft>;
+  },
+  /** Preview (commit false) or save (commit true) a P6 schedule + optional P&D log. */
+  importSchedule: async (opts: { schedule: File; pd?: File | null; project?: string; name?: string; commit?: boolean }) => {
+    const fd = new FormData();
+    fd.append("schedule", opts.schedule);
+    if (opts.pd) fd.append("pd", opts.pd);
+    if (opts.project) fd.append("project", opts.project);
+    if (opts.name) fd.append("name", opts.name);
+    fd.append("commit", opts.commit ? "true" : "false");
+    const r = await fetch("/api/import", { method: "POST", headers: headers(), body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `import → ${r.status}`);
+    return r.json() as Promise<ImportReport>;
+  },
+  /** Compare two schedule updates (or two versions inside one file). Read-only. */
+  compare: async (opts: { older: File; newer?: File | null; older_key?: string; newer_key?: string }) => {
+    const fd = new FormData();
+    fd.append("older", opts.older);
+    if (opts.newer) fd.append("newer", opts.newer);
+    if (opts.older_key) fd.append("older_key", opts.older_key);
+    if (opts.newer_key) fd.append("newer_key", opts.newer_key);
+    const r = await fetch("/api/compare", { method: "POST", headers: headers(), body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `compare → ${r.status}`);
+    return r.json() as Promise<Comparison>;
   },
   activateProject: (id: string) => post<{ active: string }>(`/api/projects/${id}/activate`, {}),
   deleteProject: (id: string) => del<{ active: string }>(`/api/projects/${id}`),

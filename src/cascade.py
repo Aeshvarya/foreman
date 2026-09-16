@@ -234,12 +234,17 @@ def run_cascade_multi(g: nx.DiGraph, delays: dict[str, int],
     label = ", ".join(f"{m} +{delays[m]}d" for m in delays) or "no delay"
     # Weakest-link confidence: we're only as sure as the least-certain delayed item.
     confidence = min((g.nodes[m]["confidence"] for m in delays), default=1.0)
+    # If every delayed item's confidence is a stand-in, say so rather than
+    # dressing the stand-in up as a level of certainty.
+    stand_in = bool(delays) and all(
+        str(g.nodes[m].get("confidence_source", "")).lower().startswith("placeholder") for m in delays)
     report = CascadeReport(
         delayed_material=label,
         delay_days=max(delays.values(), default=0),
         confidence=confidence,
-        confidence_source=(f"{len(delays)} material(s) delayed together"
-                           if delays else "no delay"),
+        confidence_source=("placeholder — no delivery status for these items" if stand_in
+                           else f"{len(delays)} material(s) delayed together" if delays
+                           else "no delay"),
         baseline_handover=baseline[handover_id].finish,
         handover_date=scenario[handover_id].finish,
     )

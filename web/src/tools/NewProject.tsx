@@ -3,6 +3,7 @@ import { Plus, Trash2, Rocket, Loader2, Building2, Package, CalendarClock, Flag 
 import { api } from "../lib/api";
 import { GlassCard, Button, Kicker } from "../components/primitives";
 import DescribeProject from "./DescribeProject";
+import ImportSchedule from "./ImportSchedule";
 import { cn } from "../lib/cn";
 
 const uid = () => crypto.randomUUID();
@@ -14,14 +15,34 @@ interface Sup { key: string; name: string; region: string; reliability: string }
 interface Mat { key: string; name: string; supplierKey: string; arrival: string; roj: string; confidence: number }
 interface Act { key: string; name: string; duration: string; needs: string[]; deps: string[] }
 
-/* Two ways in, same destination. Describing it comes first because it is the
-   one a non-technical user can actually start from; the form stays for anyone
-   who wants to place every date themselves. */
+/* Three ways in, same destination. Importing the P6 schedule comes first
+   because a running project already has one, and it is the ground truth;
+   describing it is for someone starting from nothing; the form stays for
+   anyone who wants to place every date themselves. */
+const MODES = [
+  ["import", "Import a P6 schedule"],
+  ["describe", "Describe it"],
+  ["form", "Enter it by hand"],
+] as const;
+
 export default function NewProject() {
-  const [mode, setMode] = useState<"describe" | "form">("describe");
-  return mode === "describe"
-    ? <DescribeProject onCancel={() => setMode("form")} />
-    : <FormBuilder onBack={() => setMode("describe")} />;
+  const [mode, setMode] = useState<(typeof MODES)[number][0]>("import");
+  return (
+    <div className="mx-auto max-w-[860px]">
+      <div className="mb-5 flex flex-wrap gap-2">
+        {MODES.map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)}
+            className={cn("rounded-full border px-3.5 py-1.5 text-sm transition",
+              mode === m ? "border-amber bg-amber/15 text-amber" : "border-line text-muted hover:text-text")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "import" ? <ImportSchedule />
+        : mode === "describe" ? <DescribeProject onCancel={() => setMode("form")} />
+          : <FormBuilder onBack={() => setMode("describe")} />}
+    </div>
+  );
 }
 
 function FormBuilder({ onBack }: { onBack: () => void }) {

@@ -1,5 +1,5 @@
 import { NavLink, useParams } from "react-router-dom";
-import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp, Sun } from "lucide-react";
+import { Zap, Radar, MessageSquareText, FileStack, ArrowLeft, CircleHelp, Sun, GitCompare } from "lucide-react";
 import { Wordmark } from "../primitives";
 import ProjectSwitcher from "./ProjectSwitcher";
 import { cn } from "../../lib/cn";
@@ -12,6 +12,7 @@ const TOOLS = [
   { slug: "today", label: "Today", icon: Sun },
   { slug: "cascade", label: "Cascade Simulator", icon: Zap },
   { slug: "radar", label: "Risk Radar", icon: Radar },
+  { slug: "changes", label: "Schedule Changes", icon: GitCompare },
   { slug: "ask", label: "Ask Foreman", icon: MessageSquareText },
   { slug: "build", label: "Build from Docs", icon: FileStack },
 ];

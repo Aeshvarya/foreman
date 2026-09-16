@@ -210,7 +210,9 @@ export default function Cascade() {
                 {Object.keys(debouncedDelays).length !== 1 && "s"} running late
                 {" · "}handover {report.baseline_handover}
                 {breaks && <> → <span className="text-text">{report.handover_date}</span></>}
-                {" · "}we're <b className="text-text">{sureness(report.confidence)}</b> of the dates
+                {" · "}{report.confidence_source.toLowerCase().startsWith("placeholder")
+                  ? <>no delivery status yet, so these are the <b className="text-text">schedule's own dates</b></>
+                  : <>we're <b className="text-text">{sureness(report.confidence)}</b> of the dates</>}
               </div>
             </div>
           </GlassCard>

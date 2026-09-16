@@ -9,7 +9,8 @@ import { TOURS } from "../features/tour/tours";
 
 /** Same wording as the Today brief and the simulator, so the whole app speaks
  *  with one voice instead of three. */
-function sureness(confidence: number): string {
+function sureness(confidence: number, source?: string): string {
+  if (source?.toLowerCase().startsWith("placeholder")) return "unknown — no delivery status yet";
   if (confidence >= 0.9) return "confirmed";
   if (confidence >= 0.8) return "fairly sure";
   if (confidence >= 0.65) return "not confirmed";
@@ -69,6 +70,13 @@ export default function Radar() {
               across {mc.n.toLocaleString()} simulations · expected {mc.mean_slip}d, P90 {mc.p90_slip}d
               {mc.drivers[0]?.risk_contribution > 0 && <> · biggest driver: <span className="text-text">{mc.drivers[0].name}</span></>}
             </div>
+            {(mc.placeholder_share ?? 0) >= 0.5 && (
+              <div className="mt-2 text-xs leading-relaxed text-amber">
+                Illustrative: {Math.round((mc.placeholder_share ?? 0) * 100)}% of the items have no delivery status yet,
+                so this shows how the schedule reacts to uncertainty — not a forecast. Add a P&amp;D log with
+                statuses for a real one.
+              </div>
+            )}
           </div>
         </GlassCard>
         </TourTarget>
@@ -94,7 +102,7 @@ export default function Radar() {
                 {r.name} <span className="font-sans text-sm font-normal text-faint">· from {r.supplier}</span>
               </div>
               <div className="mt-1 text-sm text-muted">
-                {bp} · status is <b className="text-text">{sureness(r.confidence)}</b>
+                {bp} · status is <b className="text-text">{sureness(r.confidence, r.confidence_source)}</b>
                 <span className="text-faint"> (based on {r.confidence_source})</span>
               </div>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">

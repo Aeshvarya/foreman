@@ -15,11 +15,12 @@ from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 # Make src/ importable so the brain modules' bare imports resolve.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -178,10 +179,18 @@ def project():
     except Exception:
         demo = False
 
+    # An imported project carries where each part came from and what had to be
+    # approximated; the UI shows it beside the numbers it qualifies.
+    try:
+        provenance = projects.get_active_project().get("import")
+    except Exception:
+        provenance = None
+
     return {
         "name": g.graph.get("name"),
         "handover": g.graph.get("handover"),
         "demo": demo,
+        "provenance": provenance,
         "counts": {
             "suppliers": kinds.count(SUPPLIER),
             "materials": kinds.count(MATERIAL),
@@ -401,6 +410,72 @@ async def projects_draft_file(file: UploadFile = File(...)):
         raise HTTPException(400, str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
+
+
+MAX_SCHEDULE_BYTES = 600_000_000     # database extracts can carry embeddings
+
+
+@app.post("/api/import")
+async def import_schedule(schedule: UploadFile = File(...),
+                          pd: UploadFile | None = File(None),
+                          project: str | None = Form(None),
+                          name: str | None = Form(None),
+                          commit: bool = Form(False)):
+    """Bring in a real schedule: a P6 .xer, or an activity table as CSV/Excel,
+    plus an optional P&D log.
+
+    Without `commit` it's a preview -- what's in the file, where each part
+    came from, what had to be approximated, and whether Foreman's starting
+    schedule reproduces P6's. Nothing is saved until the user has seen that.
+    With `commit` the project is saved and made active.
+    """
+    from importers import ImportProblem, build_import           # noqa: PLC0415
+    data = await schedule.read()
+    if not data:
+        raise HTTPException(400, f"{schedule.filename}: the file is empty")
+    if len(data) > MAX_SCHEDULE_BYTES:
+        raise HTTPException(400, f"{schedule.filename}: too large (max 600MB)")
+    pd_data = await pd.read() if pd is not None and pd.filename else None
+    try:
+        proj, report = await run_in_threadpool(
+            build_import, schedule.filename or "schedule", data,
+            project_id=project or None, name=name or None,
+            pd_filename=pd.filename if pd_data else None, pd_data=pd_data or None)
+    except ImportProblem as e:
+        raise HTTPException(400, str(e))
+    if commit:
+        try:
+            report["saved_as"] = projects.create_project(proj)
+        except (KeyError, ValueError) as e:
+            raise HTTPException(400, f"Invalid project: {e}")
+        load_to_neo4j_if_enabled(projects.get_active_project())
+    return _jsonable(report)
+
+
+@app.post("/api/compare")
+async def compare_schedules(older: UploadFile = File(...),
+                            newer: UploadFile | None = File(None),
+                            older_key: str | None = Form(None),
+                            newer_key: str | None = Form(None)):
+    """What changed between two updates of a schedule -- two files, or one file
+    that holds both versions. Read-only: no project is created or changed."""
+    from importers import ImportProblem                            # noqa: PLC0415
+    from importers.snapshots import pick_pair, snapshots           # noqa: PLC0415
+    from compare import compare                                    # noqa: PLC0415
+    a_data = await older.read()
+    b_data = await newer.read() if newer is not None and newer.filename else None
+    if len(a_data) + len(b_data or b"") > MAX_SCHEDULE_BYTES:
+        raise HTTPException(400, "files too large (max 600MB together)")
+    try:
+        a = await run_in_threadpool(snapshots, older.filename or "older", a_data)
+        b = await run_in_threadpool(snapshots, newer.filename or "newer", b_data) if b_data else a
+        o, n = pick_pair(a, b, older_key or None, newer_key or None, same_file=b_data is None)
+        result = compare(o, n)
+    except ImportProblem as e:
+        raise HTTPException(400, str(e))
+    return _jsonable({"older_options": [s.summary() for s in a],
+                      "newer_options": [s.summary() for s in b],
+                      "older_key": o.key, "newer_key": n.key, **result})
 
 
 @app.post("/api/projects/{pid}/activate")
