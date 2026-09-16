@@ -26,6 +26,42 @@ _WHATIF = re.compile(
     r"\b(what if|what happens if|if .+ (slips?|delayed?|late|slip)|"
     r"slips? \d+|delayed? by|push(ed)? back|misses? its? roj)\b", re.I)
 
+# "Which items are riskiest / have the least room / should I chase?" is exactly
+# what the risk radar computes. Answering it from the radar keeps the answer to
+# the same verified numbers the Radar page shows, and needs neither the graph
+# database nor a language model. "Why ..." questions still go to the query
+# agent, which reasons about causes.
+_RANKING = re.compile(
+    r"\b(most|biggest|highest|top|worst|riskiest|which|what)\b.*"
+    r"\b(risk|risky|at risk|critical|least room|tightest|worr(?:y|ied)|attention|chase|urgent)\b"
+    r"|\bbreaking points?\b|\bleast (?:room|float|slack)\b", re.I)
+_WHY = re.compile(r"\bwhy\b", re.I)
+
+
+def _radar_answer(top: int = 5) -> dict:
+    from risk import MAX_PROBE_DAYS, risk_radar       # noqa: PLC0415
+    from today import _how_sure                        # noqa: PLC0415
+    radar = risk_radar(get_graph())
+    tight = sorted((r for r in radar if r.breaking_point_days is not None),
+                   key=lambda r: (r.breaking_point_days, -r.risk_score))[:top]
+    trace = [{"step": "radar",
+              "detail": f"breaking point for {len(radar)} items from the schedule's longest paths",
+              "say": f"Worked out how many days each of the {len(radar)} tracked items can slip "
+                     "before the handover date moves."},
+             {"step": "rank", "detail": ", ".join(f"{r.material_id}={r.breaking_point_days}d" for r in tight),
+              "say": "Ranked them, least room first."}]
+    if not tight:
+        return {"answer": f"Nothing can move the handover date on its own: every tracked item can slip "
+                          f"more than {MAX_PROBE_DAYS} days before it does.",
+                "citations": [], "trace": trace}
+    lines = [f"{i}. **{r.name}** — {r.breaking_point_days} day{'s' if r.breaking_point_days != 1 else ''} "
+             f"of room (status: {_how_sure(r.confidence, r.confidence_source)})"
+             for i, r in enumerate(tight, 1)]
+    more = len([r for r in radar if r.breaking_point_days is not None]) - len(tight)
+    answer = ("The items with the least room before the handover date moves:\n\n" + "\n".join(lines)
+              + (f"\n\n{more} more can move it too, with more room." if more > 0 else ""))
+    return {"answer": answer, "citations": [r.material_id for r in tight], "trace": trace}
+
 
 def _label(citations: list) -> list[dict]:
     """Turn cited graph ids into things a human recognises.
@@ -65,6 +101,11 @@ def answer(question: str, scene: dict | None = None) -> dict:
     if _WHATIF.search(question):
         res = explain_cascade(question)
         res["mode"] = "cascade"
+        res["citations"] = _label(res.get("citations", []))
+        return res
+    if _RANKING.search(question) and not _WHY.search(question):
+        res = _radar_answer()
+        res["mode"] = "radar"
         res["citations"] = _label(res.get("citations", []))
         return res
     res = ask(question)
