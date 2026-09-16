@@ -92,9 +92,23 @@ A true CPM forward pass honoring both the dependency network **and** material ar
 
 ![Risk radar](screenshots/05-risk-radar.jpg)
 
-For every material, Foreman binary-searches the cascade engine for its **breaking point** — the exact number of days it can slip before the handover moves — then crosses that with how much we actually trust the data.
+For every material, Foreman finds its **breaking point** — the exact number of days it can slip before the handover moves — then crosses that with how much we actually trust the data. It reads that number straight off the schedule's longest paths (one sweep, not a search), which is why the radar and a 3,000-future Monte-Carlo run in well under a second on a 5,000-activity schedule; `tests/test_fastpaths.py` checks the answer is exactly what a full re-simulation gives.
 
 That ranking is the insight. The switchgear can slip **16 days**; the generators only **8** — and the generators' status is *"a guess"* (submittal still under review, so fabrication can't start and the arrival is inferred). The quiet, unconfirmed item outranks the loud one. A Monte-Carlo over 3,000 futures agrees: **14% chance the handover slips**, driven almost entirely by those generators.
+
+### 📥 Bring your own schedule — P6 in, preview first
+
+Import a **Primavera P6 `.xer`**, or an activity table exported as CSV / Excel, plus an optional **P&D (procurement) log**. Nothing is saved until you've seen what Foreman understood:
+
+- **Where each part came from.** Real P6 relationships (FS / SS / FF / SF, with lags) from a `.xer`, or links inferred from dates when a table has none; items from the P&D log, or the schedule's own fabricate / deliver / procure activities when there isn't one.
+- **A baseline check.** Before anything is delayed, Foreman must start every activity on its P6 date. If it doesn't, the import says so rather than quietly showing wrong numbers.
+- **What it had to approximate**, in plain words — kept on the project as a banner beside every number, not buried in a log.
+
+Real exports are messy and the importer is built for it: P6's two-row Excel headers, `" A"` / `"*"` date markers, trackers with title rows, multi-project files, anonymised files without a calendar table, finished work that ran out of sequence, start-to-start links from work already in progress. `tests/test_importers.py` builds a synthetic file for each.
+
+### 🔁 What changed since the last update
+
+Drop in two P6 updates — or one extract that keeps the previous upload — and get the weekly answer for the whole project at once: how many activities finish later and by how much, what **lost float**, what **became critical**, whether **completion moved**, and which deliveries slipped. Straight from P6's own dates and float; nothing modelled.
 
 ### 💬 Ask it in English — and watch it reason
 
@@ -244,19 +258,27 @@ On Render, `render.yaml` deploys this as-is — set `GEMINI_API_KEY` in the dash
 ## Tests
 
 ```bash
-./.venv/bin/python tests/test_mirror.py   # Neo4j ↔ NetworkX parity (needs Neo4j up)
-./.venv/bin/python tests/test_money.py    # money + recovery invariants
+./.venv/bin/python tests/test_fastpaths.py   # closed-form radar / Monte-Carlo == full re-simulation
+./.venv/bin/python tests/test_importers.py   # messy P6 / P&D exports in, P6's own dates out
+./.venv/bin/python tests/test_compare.py     # two schedule updates -> what changed
+./.venv/bin/python tests/test_links.py       # FS / SS / FF / SF + lags, hand-computed
+./.venv/bin/python tests/test_montecarlo.py  # vendor-correlated sampling, reproducible
+./.venv/bin/python tests/test_mirror.py      # Neo4j ↔ NetworkX parity (needs Neo4j up)
+./.venv/bin/python tests/test_money.py       # money + recovery invariants
 ```
 
-`test_mirror.py` is the one that matters: it proves swapping NetworkX for Neo4j changed nothing the CPM engine can see. `test_money.py` asserts recovery options never claim days they cannot deliver.
+`test_fastpaths.py` compares the longest-path shortcut against full re-simulation on 60 random schedules — 1,150 breaking points, 6,900 slips and every Monte-Carlo run, identical. `test_mirror.py` proves swapping NetworkX for Neo4j changed nothing the CPM engine can see. `test_money.py` asserts recovery options never claim days they cannot deliver.
 
 ## Repo map
 
 ```
-backend/main.py       FastAPI — 26 endpoints + static SPA serving
+backend/main.py       FastAPI — 28 endpoints + static SPA serving
 src/
   cascade.py          CPM forward pass — the core engine
-  risk.py             breaking-point binary search
+  paths.py            longest paths -> exact breaking points, fast Monte-Carlo
+  risk.py             risk radar: breaking point x confidence
+  importers/          P6 .xer / activity tables / P&D logs -> projects, with a report
+  compare.py          two schedule updates -> what moved, lost float, completion
   montecarlo.py       3,000-future simulation
   money.py            exposure, penalties, commercials
   recovery.py         ranked fixes, "buys N days" by re-simulation
@@ -274,6 +296,7 @@ src/
     cascade_agent.py  narrates CPM output in plain English
     project_builder.py  a sentence or a spreadsheet → a project
     llm.py            Gemini wrapper, caching, key handling
+scripts/              command-line importers (the same code as the Import screen)
 web/src/              React 19 dashboard, React Flow graph, Framer Motion
 data/project.json     Sunrise DC-1 — synthetic 12MW data center
 docs/ARCHITECTURE.md  deeper engineering write-up
@@ -287,6 +310,7 @@ Written by us, not extracted under questioning:
 - **The project is synthetic.** Sunrise DC-1 is invented and labelled as such *inside the app*, on every screen. The **market lead times behind it are real 2026 figures**. We asked Kaya for a live data feed on 24 July; access wasn't granted before the deadline.
 - **Confidence scores are calibrated by source type, not learned.** A GRN outranks a verbal update because that ordering is defensible, not because a model fit it to outcome data. With real project history this becomes a learning problem.
 - **The alternate-supplier ranking is a capability-vector heuristic**, not the trained GNN the research line points toward.
+- **Imports approximate where the file is silent, and say so.** Without a `.xer`, links are inferred from dates and each delivery's room comes from P6's total float — a conservative screen, which we measured over-alarming on a schedule with interim deadlines when checked against its real links. Without a P&D log, confidence is a placeholder and the app labels Monte-Carlo as illustrative. Slips move in calendar days, slightly overstating them across weekends.
 - **Aura Free auto-pauses after 3 days idle**, and the free Render instance sleeps after 15 minutes. Cold start is ~30s. If the graph database is asleep, the app falls back to the JSON mirror and only Ask degrades.
 
 ## Research grounding
