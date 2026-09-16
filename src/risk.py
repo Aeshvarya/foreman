@@ -20,6 +20,7 @@ import networkx as nx
 
 from cascade import run_cascade
 from graph import MATERIAL, build_graph
+from paths import handover_model
 
 MAX_PROBE_DAYS = 45
 
@@ -38,7 +39,20 @@ class MaterialRisk:
 
 def breaking_point(g: nx.DiGraph, material_id: str,
                    max_days: int = MAX_PROBE_DAYS) -> int | None:
-    """Smallest delay (in days) that slips the handover; None if not found."""
+    """Smallest delay (in days) that slips the handover; None if not found.
+
+    Read straight off the schedule's longest paths (see paths.py), so it costs
+    one sweep instead of a dozen cascades. Same answer as searching for it.
+    """
+    return handover_model(g).breaking_point(material_id, max_days)
+
+
+def _breaking_point_search(g: nx.DiGraph, material_id: str,
+                           max_days: int = MAX_PROBE_DAYS) -> int | None:
+    """The by-hand version: binary-search the delay with full cascades.
+
+    Kept as the reference the fast path is tested against.
+    """
     lo, hi, answer = 1, max_days, None
     # The cascade is monotonic in delay, so binary search the threshold.
     while lo <= hi:
@@ -53,12 +67,13 @@ def breaking_point(g: nx.DiGraph, material_id: str,
 def risk_radar(g: nx.DiGraph | None = None) -> list[MaterialRisk]:
     """Rank all materials by (breaking point x confidence) risk."""
     g = g or build_graph()
+    model = handover_model(g)
     out: list[MaterialRisk] = []
 
     for mat_id, node in g.nodes(data=True):
         if node["kind"] != MATERIAL:
             continue
-        bp = breaking_point(g, mat_id)
+        bp = model.breaking_point(mat_id, MAX_PROBE_DAYS)
         conf = node["confidence"]
 
         # Risk: tight breaking point is dangerous; uncertainty multiplies it.

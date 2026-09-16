@@ -23,8 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cascade import run_cascade                 # noqa: E402
 from db import get_graph                        # noqa: E402
+from paths import handover_model                # noqa: E402
 from money import cost_of_delay, fmt_money        # noqa: E402
 from risk import risk_radar                     # noqa: E402
 
@@ -37,8 +37,10 @@ TYPICAL_SLIP_DAYS = 7
 SHAKY_CONFIDENCE = 0.8
 
 
-def _how_sure(confidence: float) -> str:
+def _how_sure(confidence: float, source: str = "") -> str:
     """Percentages make people nod without understanding. Words don't."""
+    if str(source).lower().startswith("placeholder"):
+        return "unknown — no delivery status yet"
     if confidence >= 0.9:
         return "confirmed"
     if confidence >= SHAKY_CONFIDENCE:
@@ -65,15 +67,16 @@ def _urgency(slack: int | None, confidence: float) -> tuple[str, int]:
 def brief(project: dict | None = None) -> dict:
     """The whole morning brief in one call, so the page is one fetch."""
     g = get_graph()
+    model = handover_model(g)
     items = []
 
     for r in risk_radar(g):
         slack = r.breaking_point_days
         status, weight = _urgency(slack, r.confidence)
 
-        # What a normal week-long supplier slip would actually do.
-        report = run_cascade(g, r.material_id, TYPICAL_SLIP_DAYS)
-        slip = report.handover_slip_days
+        # What a normal week-long supplier slip would actually do -- the same
+        # number a full cascade gives, read off the schedule's longest paths.
+        slip = model.slip_for(r.material_id, TYPICAL_SLIP_DAYS)
         cost = cost_of_delay(slip, project)
 
         if slack is None:
@@ -100,7 +103,7 @@ def brief(project: dict | None = None) -> dict:
             "weight": weight,
             "slack_days": slack,
             "slack_text": slack_text,
-            "how_sure": _how_sure(r.confidence),
+            "how_sure": _how_sure(r.confidence, r.confidence_source),
             "confidence": r.confidence,
             "based_on": r.confidence_source,
             "risk_text": risk_text,

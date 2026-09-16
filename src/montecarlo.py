@@ -20,16 +20,16 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cascade import forward_pass          # noqa: E402
 from db import get_graph                  # noqa: E402
 from graph import MATERIAL                # noqa: E402
+from paths import handover_model          # noqa: E402
 
 # How wide is "fully uncertain"? A material we know nothing about (confidence 0)
 # gets this many days of standard deviation; a certain one gets ~0. Low-confidence
@@ -60,6 +60,10 @@ class MCResult:
     baseline_handover: str
     drivers: list[dict] = field(default_factory=list)   # material risk contributions
     vendor_correlation: float = 0.0   # shared-vendor correlation this run used
+    # Share of still-moving materials whose confidence is a stand-in rather than a
+    # status someone reported. Near 1.0 the run shows how the schedule reacts to
+    # uncertainty, not a forecast -- the UI says so.
+    placeholder_share: float = 0.0
 
 
 def _material_params(node) -> tuple[float, float]:
@@ -84,10 +88,8 @@ def simulate(g=None, n: int = 3000, seed: int = 7,
     # That is what lets rho=0 reproduce the previous output exactly rather than
     # merely closely.
     vendor_rng = np.random.default_rng(seed + 1)
-    handover_id = g.graph["handover"]
 
     materials = [(mid, d) for mid, d in g.nodes(data=True) if d.get("kind") == MATERIAL]
-    base_arrival = {mid: date.fromisoformat(d["expected_arrival"]) for mid, d in materials}
     params = {mid: _material_params(d) for mid, d in materials}
 
     # A material with no supplier recorded gets a vendor of its own, so it stays
@@ -96,38 +98,48 @@ def simulate(g=None, n: int = 3000, seed: int = 7,
     vendors = sorted(set(vendor_of.values()))
     w_shared, w_private = np.sqrt(rho), np.sqrt(1.0 - rho)
 
-    baseline = forward_pass(g)[handover_id].finish
+    # Arrivals are the only thing that varies, so handover's start is a closed
+    # form in them (paths.py): every future costs a max over the materials, not
+    # a forward pass over the whole schedule. Same numbers, ~100x faster on a
+    # real-size schedule.
+    model = handover_model(g)
+    baseline = date.fromordinal(model.base_start + model.handover_duration)
 
-    slips = np.zeros(n)
-    delays = {mid: np.zeros(n) for mid, _ in materials}
-    for i in range(n):
-        # One shock per vendor per simulated future, shared by everything it ships.
-        shocks = {v: vendor_rng.normal() for v in vendors} if rho > 0 else {}
-        overrides = {}
-        for mid, _ in materials:
-            bias, std = params[mid]
-            if std <= 0:
-                d_days = 0.0                      # delivered: nothing left to vary
-            elif rho == 0:
-                d_days = rng.normal(bias, std)    # untouched independent draw
-            else:
-                # Standardise this material's own draw, blend the vendor's shock
-                # into it, then put the result back on the material's own scale.
-                raw = rng.normal(bias, std)
-                private = (raw - bias) / std
-                d_days = bias + std * (w_shared * shocks[vendor_of[mid]]
-                                       + w_private * private)
-            delays[mid][i] = d_days
-            overrides[mid] = base_arrival[mid] + timedelta(days=int(round(d_days)))
-        finish = forward_pass(g, overrides)[handover_id].finish
-        slips[i] = (finish - baseline).days
+    mids = [mid for mid, _ in materials]
+    bias = np.array([params[m][0] for m in mids], dtype=float)
+    std = np.array([params[m][1] for m in mids], dtype=float)
+    live = std > 0                               # delivered: nothing left to vary
+    draws = np.zeros((n, len(mids)))
+    if live.any():
+        # Filled row by row, material by material -- the same order the
+        # per-future loop drew them in, so a given seed gives the same futures.
+        raw = rng.normal(bias[live], std[live], size=(n, int(live.sum())))
+        if rho == 0:
+            draws[:, live] = raw                 # untouched independent draws
+        else:
+            # One shock per vendor per simulated future, shared by everything it
+            # ships. Standardise each material's own draw, blend the vendor's
+            # shock into it, then put it back on the material's own scale.
+            shocks = vendor_rng.normal(size=(n, len(vendors)))
+            col = {v: j for j, v in enumerate(vendors)}
+            vidx = np.array([col[vendor_of[m]] for m, keep in zip(mids, live) if keep])
+            private = (raw - bias[live]) / std[live]
+            draws[:, live] = bias[live] + std[live] * (w_shared * shocks[:, vidx]
+                                                       + w_private * private)
+    delays = {mid: draws[:, j] for j, mid in enumerate(mids)}
+
+    whole_days = np.round(draws).astype(np.int64)    # half-to-even, like round()
+    pos_of = {m: j for j, m in enumerate(mids)}
+    cols = [pos_of[m] for m in model.materials]
+    starts = model.starts(whole_days[:, cols] if cols else np.zeros((n, 0), dtype=np.int64))
+    slips = (starts - model.base_start).astype(float)
 
     pos = np.clip(slips, 0, None)
     # Risk driver = correlation between a material's sampled delay and handover slip.
     drivers = []
     for mid, node in materials:
-        if delays[mid].std() < 1e-6:
-            corr = 0.0
+        if delays[mid].std() < 1e-6 or slips.std() < 1e-9:
+            corr = 0.0                    # nothing varied, so nothing to correlate
         else:
             corr = float(np.corrcoef(delays[mid], slips)[0, 1])
             if np.isnan(corr):
@@ -145,7 +157,17 @@ def simulate(g=None, n: int = 3000, seed: int = 7,
         baseline_handover=baseline.isoformat(),
         drivers=drivers,
         vendor_correlation=rho,
+        placeholder_share=_placeholder_share(materials),
     )
+
+
+def _placeholder_share(materials: list) -> float:
+    moving = [d for _, d in materials if d.get("shipment_status") != "delivered"]
+    if not moving:
+        return 0.0
+    stand_in = sum(1 for d in moving
+                   if str(d.get("confidence_source", "")).lower().startswith("placeholder"))
+    return round(stand_in / len(moving), 3)
 
 
 if __name__ == "__main__":
