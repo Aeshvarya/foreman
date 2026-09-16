@@ -23,10 +23,10 @@ const LARGE_AT = 40;
    chain still fits on one screen at a readable zoom. */
 const PATH_HEAD = 3;
 const PATH_TAIL = 3;
-/* How many slipped P&D items trace mode draws, ranked by how much work each
-   pushes back. Unlimited for now so every item is visible; set it to 12 to draw
-   only the items that matter most (the header then says how many were left out). */
-const MAX_TRACED = Number.POSITIVE_INFINITY;
+/* By default trace mode draws the slipped P&D items that push back the most
+   work, and says how many it left out; "Show all" draws every one. Past about
+   a dozen rows the fitted view gets too small to read, hence the default. */
+const TOP_TRACED = 12;
 /* Trace-mode spacing: wider columns and taller rows than the full view, so a
    path reads left → right instead of as a dense stack. */
 const T_GAP = 96, T_STEP = 230, T_ACT_X = 260;
@@ -146,7 +146,8 @@ function fullView(project: Project, delayed: Set<string>, slipped: Set<string>, 
 
 /* --------------------------------------------------------------- trace view
    For big schedules: only what the selected items touch. */
-function traceView(project: Project, delayed: Set<string>, slipped: Set<string>, handoverBreaks?: boolean) {
+function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
+                   handoverBreaks: boolean | undefined, limit: number) {
   const kindOf = new Map(project.nodes.map((n) => [n.id, n.kind as Kind]));
   const nodeById = new Map(project.nodes.map((n) => [n.id, n]));
   const out = new Map<string, string[]>();
@@ -176,7 +177,7 @@ function traceView(project: Project, delayed: Set<string>, slipped: Set<string>,
   const traced = all
     .map((m) => ({ m, r: reach(m) }))
     .sort((a, b) => b.r - a.r || a.m.localeCompare(b.m, undefined, { numeric: true }))
-    .slice(0, MAX_TRACED)
+    .slice(0, limit)
     .map((x) => x.m);
 
   const visible = new Set<string>([H]);
@@ -324,11 +325,14 @@ export default function GraphCanvas({
   const delayedKey = [...(delayedIds ?? [])].sort().join(",");
   const slippedKey = [...(slippedIds ?? [])].sort().join(",");
 
+  const [showAll, setShowAll] = useState(false);
+
   const view = useMemo(() => {
     const slipped = slippedIds ?? new Set<string>();
     const delayed = delayedIds ?? new Set<string>();
     return large
-      ? traceView(project, delayed, slipped, handoverBreaks)
+      ? traceView(project, delayed, slipped, handoverBreaks,
+                  showAll ? Number.POSITIVE_INFINITY : TOP_TRACED)
       : { ...fullView(project, delayed, slipped, handoverBreaks), items: delayed.size,
           totalItems: delayed.size, unlinked: [] as string[] };
     // Keyed on the Sets' CONTENTS, not their object identity: a caller that
@@ -337,7 +341,7 @@ export default function GraphCanvas({
     // nodes/edges array identities at that rate. Content keys make the rebuild
     // happen only when something really changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, delayedKey, slippedKey, handoverBreaks, large]);
+  }, [project, delayedKey, slippedKey, handoverBreaks, large, showAll]);
   const { nodes, edges } = view;
 
   // Belt-and-suspenders against the "blank until resize" React Flow race:
@@ -404,13 +408,19 @@ export default function GraphCanvas({
             {headers.map((l) => (
               <span key={l} className="kicker rounded-md border border-line bg-elev/70 px-2.5 py-1 backdrop-blur">{l}</span>
             ))}
+            {large && view.totalItems > TOP_TRACED && (
+              <button type="button" onClick={() => setShowAll((v) => !v)}
+                className="kicker rounded-md border border-amber/50 bg-amber/10 px-2.5 py-1 !text-amber backdrop-blur transition-colors hover:bg-amber/20">
+                {showAll ? `Show top ${TOP_TRACED}` : `Show all ${view.totalItems}`}
+              </button>
+            )}
           </div>
           <span className="kicker !text-amber/80">
             {!large ? "↳ click materials to slip several at once"
               : view.totalItems > view.items
-                ? `↳ showing the ${view.items} that push back the most work — remove some on the left to see others`
-                : view.items > 12
-                  ? "↳ many items traced — scroll to zoom in, drag to move around"
+                ? `↳ showing the ${view.items} that push back the most work — "Show all" draws every one`
+                : view.items > TOP_TRACED
+                  ? "↳ every item traced — scroll to zoom in, drag to move around"
                   : "↳ large schedule — add P&D items on the left to trace their path to handover"}
           </span>
         </Panel>
