@@ -208,6 +208,10 @@ def _normalise(data: dict) -> dict:
     }
     if isinstance(data.get("commercials"), dict) and data["commercials"]:
         out["commercials"] = data["commercials"]
+    # where an imported project came from and what was approximated, so the
+    # app can say so next to the numbers
+    if isinstance(data.get("import"), dict) and data["import"]:
+        out["import"] = data["import"]
     return out
 
 
