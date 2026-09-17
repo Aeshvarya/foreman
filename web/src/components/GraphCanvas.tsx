@@ -43,7 +43,7 @@ const CHAIN_MIN = 3;
    used to fit at, a 0.82rem name renders about 5px tall. The view fits the
    drawing when it can, and when it cannot it opens at this zoom on the
    left-hand items and lets the user pan, rather than showing an unreadable
-   whole — the minimap says how much more there is. */
+   whole; the caption says when there is more off-screen. */
 const MIN_READABLE = 0.62;
 
 const KIND_TAG: Record<Kind, string> = { supplier: "Supplier", material: "P&D item", activity: "Activity" };
@@ -448,7 +448,7 @@ export default function GraphCanvas({
      picture nobody can read is worse than a picture of part of it. So the fit
      stops at a legible zoom, and when the drawing is wider than that allows,
      the view opens on the left-hand items (where the traced story starts) and
-     the minimap and scroll do the rest. */
+     the zoom buttons and the scroll wheel do the rest. */
   const fitReadable = (duration = 300) => {
     const inst = rf.current, wrap = wrapRef.current;
     if (!inst || !wrap) return;
