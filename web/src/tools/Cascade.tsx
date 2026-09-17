@@ -32,14 +32,26 @@ export default function Cascade() {
   // material in mind — open on that one, slipped by the week the brief priced.
   const [search] = useSearchParams();
   const fromBrief = search.get("slip");
+  // "MAT-1" is the bundled demo's structural steel. On an imported project that
+  // id may not exist, and the page used to open with a phantom row showing the
+  // raw id and a cascade of nothing. Seed it only if it is really there, else
+  // fall back to the first item the project has (set once, when they load).
   const [delays, setDelays] = useState<Record<string, number>>(
-    fromBrief ? { [fromBrief]: 7 } : { "MAT-1": 5 });
+    fromBrief ? { [fromBrief]: 7 } : {});
+  const [seeded, setSeeded] = useState(!!fromBrief);
   const [debouncedDelays, setDebouncedDelays] = useState(delays);
   const [report, setReport] = useState<CascadeReport | null>(null);
   const [alts, setAlts] = useState<Record<string, AltSupplier>>({});
   const { start, steps: activeTour } = useTour();
 
   useEffect(() => { api.materials().then(setMaterials); }, []);
+
+  useEffect(() => {
+    if (seeded || materials.length === 0) return;
+    const first = materials.find((m) => m.id === "MAT-1") ?? materials[0];
+    setDelays({ [first.id]: 5 });
+    setSeeded(true);
+  }, [materials, seeded]);
 
   // Dragging a slider fires an onChange on every pixel of mouse movement —
   // tens of updates per second. Feeding that straight into the graph was
@@ -174,7 +186,7 @@ export default function Cascade() {
           {Object.keys(delays).length === 0 ? (
             <div className="text-sm text-muted">No materials selected. Add one, or click a material in the graph.</div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex max-h-[22rem] flex-col gap-3 overflow-y-auto pr-1">
               {Object.entries(delays).map(([id, days]) => (
                 <div key={id} className="rounded-lg border border-amber/20 bg-amber/[0.04] p-3">
                   <div className="mb-2 flex items-center justify-between">
