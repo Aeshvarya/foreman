@@ -176,6 +176,14 @@ def build_import(filename: str, data: bytes, *, project_id: str | None = None,
             warnings.append(f"{st['tighter_than_handover']} items have less float than handover — "
                             "usually an interim deadline. Their breaking points will read tighter "
                             "than real links would give.")
+    else:
+        why = st.pop("_handover_why", "chosen" if handover else "latest activity in the file")
+    # Every number on every screen is measured against the handover, so when it
+    # was inferred rather than named, say so where the numbers are read.
+    if not handover and why not in ("chosen", "named completion milestone"):
+        warnings.append(f"No completion milestone in the file — handover was taken as the "
+                        f"{why}. Every 'handover holds / breaks' verdict is measured against "
+                        f"that activity, so name the real one with --handover if it is wrong.")
     broken = _break_cycles(acts)
     if broken:
         warnings.append(f"{broken} links formed a loop and were dropped; a schedule can't loop.")
@@ -215,7 +223,7 @@ def build_import(filename: str, data: bytes, *, project_id: str | None = None,
                    "suppliers": len(suppliers)},
         "links_source": links_source, "materials_source": materials_source,
         "confidence_source": confidence_source,
-        "handover": {"id": h_id, "name": h_act["name"],
+        "handover": {"id": h_id, "name": h_act["name"], "why": why,
                      "p6_finish": p6_finish.isoformat() if p6_finish else None,
                      "matches_p6": matches, "moved_before_any_delay": moved},
         "stats": {k: v for k, v in sorted({**st, **{f"materials_{k}": v for k, v in ms.items()}}.items())

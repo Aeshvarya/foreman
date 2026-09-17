@@ -86,6 +86,11 @@ def create_project(data: dict) -> str:
     """Validate + normalise a user-built project, save it, make it active."""
     proj = _normalise(data)
     pid = _slug(proj["project"]["name"])
+    # Seed first: on a fresh clone data/projects/ does not exist yet (it is
+    # gitignored runtime state), and writing the file before _read_index() had
+    # a chance to create the folder made the very first import crash with
+    # FileNotFoundError after all the parsing work had already succeeded.
+    _ensure_seed()
     (PROJECTS_DIR / f"{pid}.json").write_text(json.dumps(proj, indent=2))
     idx = _read_index()
     idx["projects"].append({"id": pid, "name": proj["project"]["name"],

@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
-from .names import is_delivery, item_name, lead_time_days
+from .names import COMPLETION_RE, is_delivery, item_name, lead_time_days
 from .tables import ImportProblem, decode
 
 DROP_TYPES = {"TT_LOE", "TT_WBS"}
@@ -196,8 +196,27 @@ def schedule_from_xer(tables: dict, proj_id: str | None = None, handover_code: s
             raise ImportProblem(f"No activity with code {handover_code!r} to use as handover.")
         handover = handover_code
     else:
-        fin = [a for a in acts if a["_type"] == "TT_FinMile"] or acts
-        handover = max(fin, key=lambda a: a["_end"])["id"]
+        # The same ladder the activity-table importer uses. The old rule was
+        # "latest TT_FinMile, else the latest-finishing activity of any type",
+        # and on a real export with no finish milestone that picked a PROCUREMENT
+        # line ("Procure Structural Steel - Level 1") as the handover: a leaf with
+        # no successors, so nothing could ever cascade into it and every verdict
+        # came back "handover holds". A named completion milestone comes first,
+        # then any zero-duration milestone, and a delivery/fabrication activity is
+        # only ever used as the last resort.
+        named = [a for a in acts if COMPLETION_RE.search(a["name"])]
+        fin_mile = [a for a in acts if a["_type"] == "TT_FinMile"]
+        milestones = [a for a in acts if a["_type"] in ("TT_Mile", "TT_FinMile")]
+        build = [a for a in acts if not is_delivery(a["name"])]
+        for pool, why in ((named, "named completion milestone"),
+                          (fin_mile, "P6 finish milestone"),
+                          (milestones, "latest milestone"),
+                          (build, "latest non-delivery activity"),
+                          (acts, "latest activity in the file")):
+            if pool:
+                handover = max(pool, key=lambda a: a["_end"])["id"]
+                stats["_handover_why"] = why
+                break
     p6_handover_finish = next((a["_end"].date() for a in acts if a["id"] == handover), None)
     for a in acts:
         for k in ("_type", "_end", "_clndr", "_act"):
